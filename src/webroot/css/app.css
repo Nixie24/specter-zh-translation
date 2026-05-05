@@ -772,6 +772,7 @@ md-divider.settings-divider {
 [dir="rtl"] .nav-bar {
   left: auto;
   right: 50%;
+  transform: translateX(50%);
 }
 
 .nav-indicator {
@@ -901,6 +902,7 @@ md-filled-tonal-button {
 [dir="rtl"] .md-toast {
   left: auto;
   right: 50%;
+  transform: translateX(50%) translateY(120px);
 }
 
 .md-toast--success {
