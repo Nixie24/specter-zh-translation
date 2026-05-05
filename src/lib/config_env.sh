@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 cfg_get() {
     _cg_key="$1" _cg_default="$2"
     _cg_val=$(ksud module config get "$_cg_key" 2>/dev/null) || \

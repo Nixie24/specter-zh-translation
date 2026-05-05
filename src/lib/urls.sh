@@ -1,3 +1,4 @@
+# shellcheck shell=sh disable=SC2034
 KEYBOX_URL="https://rawbin.netlify.app/key"
 ATTESTATION_URL="https://rawbin.netlify.app/clips/attestation"
 HMA_CONFIG_URL="https://rawbin.netlify.app/clips/config"

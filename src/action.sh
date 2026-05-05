@@ -1,7 +1,9 @@
 #!/system/bin/sh
+# shellcheck shell=sh
 set -e
 MODDIR=${0%/*}
 
+# shellcheck disable=SC3040
 set +o standalone
 unset ASH_STANDALONE
 

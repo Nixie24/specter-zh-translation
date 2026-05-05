@@ -1,3 +1,4 @@
+# shellcheck shell=sh disable=SC3057,SC3052
 ROOT_SOL=""
 
 log() { echo "[$1] $2"; }

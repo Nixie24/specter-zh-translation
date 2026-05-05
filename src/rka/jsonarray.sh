@@ -235,6 +235,7 @@ _ja_ensure() {
     printf '[]' > "$1"
   }
 }
+# shellcheck disable=SC3028,SC3040
 _ja_uuid() {
   cat /proc/sys/kernel/random/uuid 2>/dev/null || \
     printf '%04x%04x-%04x-%04x-%04x-%04x%04x%04x\n' \

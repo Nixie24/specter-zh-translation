@@ -1,3 +1,4 @@
+# shellcheck shell=sh disable=SC2034
 FIXED_TARGETS="\
 android
 io.github.qwq233.keyattestation?
