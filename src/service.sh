@@ -115,13 +115,6 @@ log "SERVICE" "Boot completed - applying hardening"
 apply_boot_hardening
 log "SERVICE" "Boot hardening applied"
 
-# DroidGuard killer - force-stop GMS and related services to break attestation
-log "SERVICE" "Force-stopping GMS packages..."
-for _pkg in $GMS_KILL_LIST; do
-  am force-stop "$_pkg" 2>/dev/null || log "SERVICE" "Warning: Failed to stop $_pkg"
-done
-unset _pkg
-log "SERVICE" "GMS packages stopped"
 
 # Hide TWRP / OrangeFox / FOX recovery folders from /sdcard
 log "SERVICE" "Hiding recovery folders..."
