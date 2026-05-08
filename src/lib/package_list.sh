@@ -12,7 +12,7 @@ DETECTOR_APPS="com.zhenxi.hunter icu.nullptr.nativetest icu.nullptr.applistdetec
 
 GMS_APPS="com.android.vending com.google.android.gsf com.google.android.gms com.google.android.contactkeys com.google.android.ims com.google.android.safetycore com.google.android.apps.walletnfcrel com.google.android.apps.nbu.paisa.user"
 
-GMS_KILL_LIST="com.android.vending com.android.chrome com.google.android.googlequicksearchbox com.google.android.ims com.google.android.gms com.google.android.gms.persistent com.google.android.gms.unstable com.google.android.gsf com.google.android.contactkeys com.google.android.rkpdapp com.google.android.widevine com.google.android.apps.bard com.google.android.apps.walletnfcrel com.google.android.apps.messaging"
+GMS_KILL_LIST="com.android.vending com.google.android.gms com.google.android.gms.persistent com.google.android.gms.unstable com.google.android.gsf com.google.android.ims com.google.android.contactkeys com.google.android.safetycore com.google.android.rkpdapp com.android.chrome com.google.android.googlequicksearchbox"
 
 REMOTE_CONTROL_APPS="com.anydesk.anydeskandroid com.teamviewer.teamviewer.market.mobile com.teamviewer.quicksupport.market com.sand.airdroid com.sand.airmirror com.koushikdutta.vysor com.genymobile.scrcpy com.microsoft.rdc.androidx com.realvnc.viewer.android com.splashtop.remote.pad.v2 com.dwservice.dwagent com.carriez.flutter_hbb com.carriez.flutter_hbbclient com.rustdesk.rustdesk"
 

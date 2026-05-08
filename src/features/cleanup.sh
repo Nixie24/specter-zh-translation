@@ -99,7 +99,7 @@ log "CLEANUP" "Checking for bootloader spoofer conflicts..."
 disable_bootloader_spoofer
 
 log "CLEANUP" "Applying prop hardening..."
-apply_prop_hardening
+apply_prop_hardening || true
 log "CLEANUP" "Prop hardening applied"
 
 resetprop -n persist.sys.dev_mode 0

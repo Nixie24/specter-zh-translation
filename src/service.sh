@@ -9,72 +9,14 @@ detect_root_solution
 
 log "SERVICE" "Setting boot properties"
 
-# ============================================================================
-# EARLY BOOT PROPS (immediate, no wait)
-# ============================================================================
+# Resolve conflicts — block/adapt to other modules
+resolve_conflicts
+log "SERVICE" "Conflicts resolved"
 
-# --- Security model ---
-sp_try ro.boot.selinux enforcing
-sp_try ro.build.selinux 1
-sp_try ro.secure 1
-sp_try ro.adb.secure 1
-sp_try ro.debuggable 0
-sp_try ro.force.debuggable 0
-sp_try ro.kernel.qemu 0
-sp_try ro.boot.qemu 0
-sp_try ro.crypto.state encrypted
-sp_try ro.hardware.virtual_device 0
+_feature_enabled() { [ "$(cfg_get "$1" 1)" != "0" ]; }
 
-# --- Build identity ---
-sp_try ro.build.type user
-sp_try ro.build.tags release-keys
-while IFS= read -r _prop; do
-  [ -z "$_prop" ] && continue
-  case "$_prop" in
-    *.build.type) sp_try "$_prop" user ;;
-    *.build.tags) sp_try "$_prop" release-keys ;;
-  esac
-done <<PROPS
-$(resetprop 2>/dev/null | grep -oE 'ro\.[^.]+\.build\.(type|tags)' || true)
-PROPS
-unset _prop
-
-# --- Boot state ---
-sp_try ro.boot.verifiedbootstate green
-sp_try vendor.boot.verifiedbootstate green
-sp_try ro.boot.vbmeta.device_state locked
-sp_try vendor.boot.vbmeta.device_state locked
-sp_try ro.boot.flash.locked 1
-sp_try ro.boot.veritymode enforcing
-sp_try ro.boot.veritymode.managed yes
-sp_try ro.boot.vbmeta.avb_version 2.0
-sp_try ro.boot.vbmeta.hash_alg sha256
-
-# --- Warranty bits ---
-sp_try ro.warranty_bit 0
-sp_try ro.boot.warranty_bit 0
-sp_try ro.vendor.warranty_bit 0
-sp_try ro.vendor.boot.warranty_bit 0
-sp_try ro.is_ever_orange 0
-sp_try ro.secureboot.lockstate locked
-
-# --- OEM-specific ---
-sp_try ro.boot.realme.lockstate 1
-sp_try ro.boot.realmebootstate green
-sp_try sys.oem_unlock_allowed 0
-sp_try ro.oem_unlock_supported 0
-
-# --- Recovery hiding ---
-sp_try ro.bootmode recovery unknown
-sp_try ro.boot.bootmode recovery unknown
-sp_try vendor.boot.bootmode recovery unknown
-sp_try ro.boot.mode recovery unknown
-
-# --- USB / ADB ---
-sp_try sys.usb.config mtp
-sp_try sys.usb.adb.disabled 1
-sp_try persist.sys.usb.config none
-sp_try service.adb.root 0
+# Early boot props (immediate, no wait)
+apply_boot_props
 
 # Protect SELinux policy files
 if [ "$(toybox cat /sys/fs/selinux/enforce 2>/dev/null)" = "0" ]; then
@@ -100,13 +42,7 @@ fi
 
 log "SERVICE" "Boot properties set"
 
-# ============================================================================
-# AFTER BOOT COMPLETED
-# ============================================================================
-
-# Feature toggle gating — skip if disabled via Control page
-_feature_enabled() { [ "$(cfg_get "$1" 1)" != "0" ]; }
-
+# After boot completed
 # KernelSU / APatch: boot-completed.sh handles hardening
 [ "$KSU" = "true" ] && {
   log "SERVICE" "KernelSU/APatch detected - boot-completed.sh handles hardening"
@@ -136,8 +72,6 @@ log "SERVICE" "Running boot-time features..."
 
 _feature_enabled toggle_boot_hash && sh "$MODDIR/features/boot_hash.sh" 2>/dev/null || true
 _feature_enabled toggle_security_patch && sh "$MODDIR/features/security_patch.sh" 2>/dev/null || true
-
-_feature_enabled toggle_bootloader_spoofer && disable_bootloader_spoofer
 
 _feature_enabled toggle_suspicious_props && sh "$MODDIR/features/suspicious_props.sh" >/dev/null 2>&1 || true
 

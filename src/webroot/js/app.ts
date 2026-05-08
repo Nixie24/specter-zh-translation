@@ -1,7 +1,7 @@
 import './material.js';
 import { initBridge, spawnScript, exec, getModuleDir as getBridgeModuleDir } from './bridge.js';
-import { setModuleDir, migrateLocalStorage, cfgGet, cfgSet, cfgFlush } from './cfg.js';
-import { initDevice, refreshDevice, refreshKeyboxStatus, loadBlacklistContent, saveBlacklistContent, loadSmartmergeContent, saveSmartmergeContent } from './device.js';
+import { setModuleDir, migrateLocalStorage, cfgGet, cfgSet, cfgFlush, cfgInvalidate } from './cfg.js';
+import { initDevice, refreshDevice, refreshKeyboxStatus, loadBlacklistContent, saveBlacklistContent, loadSmartmergeContent, saveSmartmergeContent, refreshConflictStatus } from './device.js';
 import { initNetwork } from './network.js';
 import { initTheme } from './theme.js';
 import { initI18n, getTranslation } from './i18n.js';
@@ -69,6 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   wireSmartmergeEditor();
   wireToggles();
   wireControlToggles();
+  wireConflictToggles();
   initRedirect();
   buildFriendlyNames();
 
@@ -735,6 +736,107 @@ function wireControlToggles() {
     cfgGet(key, '1').then(val => { sw.selected = val !== '0'; });
     sw.addEventListener('change', () => {
       cfgSet(key, sw.selected ? '1' : '0');
+    });
+  }
+}
+
+async function refreshControlToggles() {
+  cfgInvalidate();
+  const toggles: Array<{ id: string; key: string }> = [
+    { id: 'toggle-boot_hardening', key: 'toggle_boot_hardening' },
+    { id: 'toggle-bootloader_spoofer', key: 'toggle_bootloader_spoofer' },
+    { id: 'toggle-rom_spoof', key: 'toggle_rom_spoof' },
+    { id: 'toggle-lsposed', key: 'toggle_lsposed' },
+    { id: 'toggle-action_gms', key: 'toggle_action_gms' },
+    { id: 'toggle-action_target', key: 'toggle_action_target' },
+    { id: 'toggle-action_security_patch', key: 'toggle_action_security_patch' },
+    { id: 'toggle-action_boot_hash', key: 'toggle_action_boot_hash' },
+    { id: 'toggle-action_pif', key: 'toggle_action_pif' },
+  ];
+  for (const { id, key } of toggles) {
+    const sw = document.getElementById(id) as any;
+    if (!sw) continue;
+    const val = await cfgGet(key, '1');
+    sw.selected = val !== '0';
+  }
+}
+
+async function wireConflictToggles() {
+  const moddir = getBridgeModuleDir();
+  if (!moddir) return;
+
+  const data = await refreshConflictStatus();
+  if (!data || data.length === 0) return;
+
+  const title = document.getElementById('conflicts-title');
+  const desc = document.getElementById('conflicts-desc');
+  const container = document.getElementById('conflicts-container');
+  if (!title || !desc || !container) return;
+
+  title.style.display = '';
+  desc.style.display = '';
+  container.innerHTML = '';
+
+  for (const mod of data) {
+    const row = document.createElement('div');
+    row.className = 'list-item list-item--toggle';
+
+    const icon = document.createElement('div');
+    icon.className = 'li-icon';
+    icon.innerHTML = '<md-icon aria-hidden="true">warning</md-icon>';
+
+    const content = document.createElement('div');
+    content.className = 'list-item-content';
+
+    const label = document.createElement('div');
+    label.className = 'toggle-text';
+    label.textContent = mod.friendlyName;
+
+    const hint = document.createElement('span');
+    hint.className = 'supporting-text';
+    hint.id = `conflict-hint-${mod.key}`;
+    hint.textContent = mod.prioritySpecter ? 'Priority → Specter' : `Priority → ${mod.friendlyName}`;
+
+    content.appendChild(label);
+    content.appendChild(hint);
+
+    const spacer = document.createElement('div');
+    spacer.className = 'spacer';
+
+    const sw = document.createElement('md-switch');
+    sw.icons = true;
+    sw.id = `conflict-switch-${mod.key}`;
+    sw.selected = !mod.prioritySpecter; // ON = module priority
+
+    row.appendChild(icon);
+    row.appendChild(content);
+    row.appendChild(spacer);
+    row.appendChild(sw);
+    container.appendChild(row);
+
+    sw.addEventListener('change', async () => {
+      sw.disabled = true;
+      try {
+        const isModule = sw.selected; // true = module priority, false = specter priority
+        const choice = isModule ? 'priority_module' : 'priority_specter';
+
+        const cmd = `sh ${shellEscape(moddir + '/webroot/common/conflicts.sh')} set ${shellEscape(mod.key)} ${shellEscape(choice)}`;
+        const result = await exec(cmd);
+        const code = (result as any).code;
+        if (typeof code === 'number' && code !== 0) {
+          const err = (result as any).stderr || 'Failed to update';
+          throw new Error(String(err));
+        }
+
+        hint.textContent = isModule ? `Priority → ${mod.friendlyName}` : 'Priority → Specter';
+        showToast(`${mod.friendlyName}: ${isModule ? 'Module handles it' : 'Specter handles it'}`, { icon: 'check_circle', type: 'success' as any, autoCloseDelay: 2500 });
+        await refreshControlToggles();
+      } catch (e) {
+        showToast('Failed to update', { icon: 'error', type: 'error' as any, autoCloseDelay: 3000 });
+        sw.selected = !sw.selected;
+      } finally {
+        sw.disabled = false;
+      }
     });
   }
 }

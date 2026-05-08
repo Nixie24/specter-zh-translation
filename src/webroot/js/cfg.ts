@@ -45,6 +45,14 @@ export function cfgSet(key: string, val: string | undefined | null) {
   }, 500);
 }
 
+export function cfgInvalidate(key?: string) {
+  if (key) {
+    delete cache[key];
+  } else {
+    for (const k of Object.keys(cache)) delete cache[k];
+  }
+}
+
 export async function cfgFlush() {
   if (flushTimer) clearTimeout(flushTimer);
   flushTimer = null;

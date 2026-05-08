@@ -88,7 +88,7 @@ Types: `fix:`, `feat:`, `refactor:`, `chore:`, `docs:`, `test:`
 
 ### Boot Script Safety
 
-- `service.sh` and `boot-completed.sh` run in critical boot phases. Every `resetprop` call must use `resetprop_if_diff` (has `2>/dev/null || true` guards) — never `check_prop()`.
+- `service.sh` and `boot-completed.sh` run in critical boot phases. Every `resetprop` call must use functions with `2>/dev/null || true` guards — never `check_prop()`.
 - Shared functions from `common.sh` (`apply_prop_hardening()`, `check_prop()`, `disable_rom_spoof_engines()`, `persistprop()`) must NOT be called from boot scripts. They lack error guards or write to persistent storage. A single unguarded failure with `set -e` causes a bootloop.
-- Boot scripts use inline `resetprop_if_diff` calls. The only shared functions safe to call are `resetprop_if_diff`, `resetprop_if_match`, `apply_boot_hardening`, and `hide_recovery_folders` — all internally have `|| true` on every fallible command.
+- Boot scripts use `apply_boot_props()` (data-driven, uses `sp_try` with full guards) for all early boot property hardening. The only shared functions safe to call are `apply_boot_props`, `resetprop_if_diff`, `resetprop_if_match`, `apply_boot_hardening`, and `hide_recovery_folders` — all internally have `|| true` on every fallible command.
 - `apply_prop_hardening()` is for on-demand use only (called from `cleanup.sh` and WebUI "Clear All Detection Traces" action). Never call it from boot scripts.

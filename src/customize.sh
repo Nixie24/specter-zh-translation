@@ -1,7 +1,9 @@
 # shellcheck shell=sh
+MODDIR="$MODPATH"
 . "$MODPATH/lib/common.sh"
 . "$MODPATH/lib/urls.sh"
 . "$MODPATH/lib/paths.sh"
+. "$MODPATH/lib/config_env.sh"
 
 _vol() {
   while true; do
@@ -9,6 +11,7 @@ _vol() {
     case "$_vol_key" in
       *KEY_VOLUMEUP*)   unset _vol_key; return 0 ;;
       *KEY_VOLUMEDOWN*) unset _vol_key; return 1 ;;
+      *KEY_POWER*)      unset _vol_key; return 2 ;;
     esac
     unset _vol_key
   done
@@ -30,41 +33,6 @@ case "$ROOT_SOL" in
   magisk)   ui_print "- Magisk root detected"   ;;
   legacy)   ui_print "- Legacy root detected"   ;;
 esac
-
-_CONFLICT_PKGS="es.chiteroman.bootloaderspoofer com.sevtinge.hyperceiler com.luckyzyx.luckytool"
-_CONFLICT_FOUND=""
-for _pkg in $_CONFLICT_PKGS; do
-  if grep -q "$_pkg" /data/system/packages.list 2>/dev/null; then
-    _CONFLICT_FOUND="$_CONFLICT_FOUND $_pkg"
-  fi
-done
-
-if [ -n "$_CONFLICT_FOUND" ]; then
-  ui_print ""
-  ui_print " Conflicting packages detected:"
-  for _pkg in $_CONFLICT_FOUND; do
-    ui_print "    $_pkg"
-  done
-  ui_print ""
-  ui_print " These may interfere with Specter's spoofing."
-  ui_print ""
-  ui_print " Stop them automatically on each boot?"
-  ui_print "  Vol Up   = Yes (disable on boot)"
-  ui_print "  Vol Down = No (keep as is)"
-  ui_print ""
-  _vol; _choice=$?
-  mkdir -p /data/adb/Specter
-  if [ $_choice -eq 0 ]; then
-    ui_print "- Will stop conflicting packages on boot."
-    echo "enabled" > /data/adb/Specter/conflict_choice
-  else
-    ui_print "- Keeping conflicting packages."
-    echo "disabled" > /data/adb/Specter/conflict_choice
-  fi
-  unset _choice
-  ui_print ""
-fi
-unset _CONFLICT_PKGS _CONFLICT_FOUND _pkg
 
 _ts_found=false
 if [ -d "/data/adb/modules/tricky_store" ] || [ -d "/data/adb/modules_update/tricky_store" ]; then
@@ -137,5 +105,31 @@ unset _ts_found
 
 mkdir -p "$MODPATH/webroot/json"
 RUNTIME_DIR=$(printf '%s' "$MODPATH" | sed 's|/modules_update/|/modules/|')
+
+# Interactive conflict resolution for each detected module
+for _cm_mod in "zygisk_nohello|NoHello" "tsupport-advance|TSupport-Advance" "vbmeta-fixer|VBMeta-Fixer" "treat_wheel|TreatWheel"; do
+  _cm_id="${_cm_mod%|*}"
+  _cm_name="${_cm_mod#*|}"
+  [ -d "/data/adb/modules/$_cm_id" ] || continue
+
+  ui_print ""
+  ui_print " $_cm_name detected!"
+  ui_print "  Vol Up   = Priority → Specter"
+  ui_print "  Vol Down = Priority → $_cm_name"
+  ui_print "  (Remove from root manager if you encounter issues)"
+  _vol; _cm_choice=$?
+
+  case $_cm_choice in
+    0) cfg_set "conflict_$_cm_id" "priority_specter"
+       ui_print "  → Specter takes priority over $_cm_name"
+       ui_print "  (Remove $_cm_name from your root manager if issues persist)" ;;
+    1) cfg_set "conflict_$_cm_id" "priority_module"
+       ui_print "  → $_cm_name takes priority over Specter" ;;
+  esac
+  unset _cm_choice
+  # Drain leftover key-up events before next module prompt
+  sleep 0.3 2>/dev/null || usleep 300000 2>/dev/null || true
+done
+unset _cm_mod _cm_id _cm_name
 
 return 0

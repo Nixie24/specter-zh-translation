@@ -148,8 +148,6 @@ else
   log "KEYBOX" "Warning: Could not extract serial for revocation check"
 fi
 
-_author=$(grep 'author=' /data/adb/modules/tricky_store/module.prop 2>/dev/null | head -1 | cut -d= -f2 | tr '[:upper:]' '[:lower:]')
-
 _install_teesimulator() {
   log "KEYBOX" "TEE Simulator detected, generating locked.xml format"
 
@@ -199,14 +197,12 @@ _clear_keybox_id() {
   printf '%s' "" > "$CONFIG_DIR/kb_private.val" 2>/dev/null || true
 }
 
-case "$_author" in
-  *jingmatrix*)
+if _is_teesimulator; then
     _install_teesimulator
     _clear_keybox_id
     log "KEYBOX" "Finish"
     exit 0
-    ;;
-esac
+fi
 
 mv "$DECODE_FILE" "$TARGET_FILE" || die "Failed to move decoded keybox to $TARGET_FILE"
 _clear_keybox_id

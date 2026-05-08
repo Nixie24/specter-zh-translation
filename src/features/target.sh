@@ -16,8 +16,7 @@ if [ -d "/data/adb/modules/TA_utl" ] || [ -d "/data/adb/modules/.TA_utl" ]; then
   exit 0
 fi
 
-case "$(grep 'author=' /data/adb/modules/tricky_store/module.prop 2>/dev/null | head -1 | cut -d= -f2 | tr '[:upper:]' '[:lower:]')" in
-  *jingmatrix*)
+if _is_teesimulator; then
     log "TARGET" "TEESimulator — generating locked.xml section"
     _cust="/sdcard/Specter/customize.txt"
     if [ -f "$_cust" ] && [ "$(head -1 "$_cust" 2>/dev/null)" != "#disable" ]; then
@@ -40,8 +39,7 @@ case "$(grep 'author=' /data/adb/modules/tricky_store/module.prop 2>/dev/null | 
     unset _cust
     log "TARGET" "Finish (TEESimulator)"
     exit 0
-    ;;
-esac
+fi
 
 _count=0
 MODULE_ROOT="${MODDIR%/features}"

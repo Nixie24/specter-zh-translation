@@ -151,14 +151,12 @@ specter/
 Action button
   → action.sh
     → set -e; MODDIR=${0%/*}; . "$MODDIR/lib/common.sh"
-    → sh "$MODDIR/orchestrator.sh" full_integrity || exit $?
-      → reads pipelines/full_integrity
-      → sh features/gms.sh
-      → sh features/target.sh
-      → sh features/security_patch.sh
-      → sh features/boot_hash.sh
-      → sh features/keybox.sh
-      → sh features/pif.sh?          (? = optional, skips if file missing with warning)
+    → _feature_enabled toggle_action_gms && sh features/kill_play_store.sh
+    → _feature_enabled toggle_action_target && sh features/target.sh
+    → _feature_enabled toggle_action_security_patch && sh features/security_patch.sh
+    → _feature_enabled toggle_action_boot_hash && sh features/boot_hash.sh
+    → sh features/keybox.sh                     (always runs)
+    → _feature_enabled toggle_action_pif && sh features/pif.sh
     → run_device_info "$MODDIR"       (writes webroot/json/info.json)
 
 WebUI button
@@ -170,18 +168,19 @@ WebUI button
 
 Boot (KernelSU / APatch):
   → service.sh (late_start service, non-blocking)
-    → inline resetprop_if_diff for ro.boot.*, ro.build.*, etc.
-    → inline resetprop_if_match for recovery mode hiding
+    → resolve_conflicts()          (detect + adapt to conflicting modules)
+    → apply_boot_props()           (data-driven prop hardening via sp_try)
     → vbmeta fixer via read_vbmeta() (wrapped in || echo "")
-    → exits early - boot-completed.sh handles post-boot hardening
+    → exits early — boot-completed.sh handles post-boot hardening
   → boot-completed.sh (at ACTION_BOOT_COMPLETED)
     → apply_boot_hardening()       (settings put + resetprop)
     → cfg_set for override.description
 
 Boot (Magisk):
   → service.sh (late_start service)
-    → inline resetprop_if_diff for ro.boot.*, ro.build.*, etc.
-    → vbmeta fixer, additional hardening (inline)
+    → resolve_conflicts()          (detect + adapt to conflicting modules)
+    → apply_boot_props()           (data-driven prop hardening via sp_try)
+    → vbmeta fixer, additional hardening
     → polls sys.boot_completed (while/getprop loop) for post-boot actions
     → apply_boot_hardening()       (done inline in service.sh)
     → hide_recovery_folders()
@@ -384,7 +383,7 @@ Boot scripts (`service.sh`, `boot-completed.sh`) run in a different risk environ
 
 ### The Rule
 
-**Boot scripts must use inline `resetprop_if_diff`, never shared abstraction functions like `apply_prop_hardening()` / `check_prop()`.**
+**Boot scripts use `apply_boot_props()` (data-driven, uses `sp_try` with full guards) for all early property hardening, plus inline `resetprop_if_diff` for any additional props.**
 
 ```
                     resetprop_if_diff()          check_prop()
@@ -400,17 +399,12 @@ With `set -e` at the top of every boot script, an unguarded `resetprop` failure 
 
 ### What Is Safe at Boot
 
-Safe — uses `resetprop_if_diff` or explicit `|| echo ""` / `|| true`:
-- All `ro.boot.*`, `ro.build.*`, `ro.debuggable`, `ro.secure`, etc.
+Safe — uses `sp_try`/`resetprop_if_diff` or explicit `|| echo ""` / `|| true`:
+- `apply_boot_props()` — data-driven loop calling `sp_try()` which has `|| true` on every resetprop
+- All `ro.boot.*`, `ro.build.*`, `ro.debuggable`, `ro.secure`, etc. — via `apply_boot_props()`
 - `read_vbmeta()` — because the caller wraps it in `|| echo ""` before passing through
 - `resetprop_if_match()` — same guards as `resetprop_if_diff`
 - `apply_boot_hardening()` — every internal command has `|| true`
-
-Not safe at boot — lacks error guards or writes to persistent storage:
-- `check_prop()` — no `2>/dev/null || echo ""` on read, no `2>/dev/null || true` on write (unless explicitly added by caller)
-- `apply_prop_hardening()` — internally calls `check_prop()` 30+ times
-- `disable_rom_spoof_engines()` — uses `persistprop()` which writes to `/data/property/persistent_properties`
-- `persistprop()` — writes persistent properties at a stage where system services may be initializing
 
 ### Design Principle
 
@@ -511,18 +505,22 @@ persistprop()                  # Persistent prop set + backup — NOT safe at bo
 hide_recovery_folders()        # Remove/hide TWRP/OrangeFox/PBRP folders from /sdcard
 apply_prop_hardening()         # Lock down security props — on-demand only, NEVER at boot
 apply_boot_hardening()         # settings put + resetprop for security hardening (boot-safe)
+apply_boot_props()             # Data-driven prop hardening — single source of truth for all boot props (boot-safe)
+_is_teesimulator()             # Detect TEESimulator by checking for spoof_build_vars file
 ensure_dir()                   # mkdir -p
 _escape_json()                 # Sanitize string for JSON embedding
 version_ge()                   # Semantic version comparison (awk-based)
-read_vbmeta()                  # Read real vbmeta block device → size + sha256 digest
+read_vbmeta()                  # Read real vbmeta block device → size + sha256 digest (single-pass via dd)
 run_device_info()              # Find and execute device-info.sh across possible paths
 _parse_serial()                # Parse ASN.1 DER-encoded certificate serial
 decode_keybox_serial()         # Extract serial from keybox certificate (base64 → hex → DER)
 check_google_revocation()      # Check keybox serial against Google's attestation endpoint
 find_kmInstallKeybox()         # Locate KmInstallKeybox vendor binary
 resolve_module_root()          # Resolve module root from script path (webroot/common/ support)
-disable_rom_spoof_engines()    # Detect and disable ROM spoof engines (pihooks/pixelprops/entryhooks)
-decode_keybox_blob()           # Reverse shuffled base64 → plain base64 → decode (shared alphabet with rawbin)
+disable_rom_spoof_engines()    # Detect and disable ROM spoof engines (pihooks/pixelprops/entryhooks) — data-driven
+block_rom_spoof_engines()      # Background-safe ROM spoof engine blocker (data-driven map, uses sp_persist)
+disable_bootloader_spoofer()   # Detect and remove es.chiteroman.bootloaderspoofer + wppenhacer config (uses cmd or pm fallback)
+resolve_conflicts()            # Auto-detect conflicting modules and resolve via config choice (rename scripts or adapt Specter)
 STD_ALPHABET / SHUFFLED_ALPHABET  # Custom base64 alphabet for keybox delivery obfuscation
 ```
 

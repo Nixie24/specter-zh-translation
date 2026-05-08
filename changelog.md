@@ -141,6 +141,19 @@
 - Toggle values stored as config files via `cfg_get`/`cfg_set` — survive reboots and app uninstalls.
 - Every feature script sources `config_env.sh` and gates itself against its toggle before running.
 
+### Conflict Resolution System
+- Data-driven conflict registry (`_conflict_registry`) in `common.sh` — single source of truth for module metadata, scripts, and feature claims.
+- `_conflict_claimed()` iterates all registry entries dynamically — adding a new conflicting module requires one line in the registry. No hardcoded case blocks.
+- `resolve_conflicts()` and `_conflict_claimed()` are now fully data-driven loops over the registry instead of per-module hardcoded blocks.
+- `apply_conflict_toggles()` now correctly enables Specter features when no module claims priority, and disables them when any `priority_module` claims the feature.
+- `conflict_set_choice()` — saves choice to module config, renames/restores the conflicting module's boot scripts, and recalculates all toggles.
+- Config migration: old `/data/adb/Specter/config/conflict_*.val` files are automatically migrated to module config on first boot.
+- Conflict backup system restored — `conflict_backups.txt` tracks renamed scripts so `uninstall.sh` can restore them.
+- WebUI integration: `conflicts.sh` helper script exposes JSON status and set commands to the WebUI.
+- Removed hardcoded module lists from TypeScript — all conflict data comes from shell registry via JSON.
+- Toggle states refresh live after conflict change — no page reload needed.
+- `apply_prop_hardening()` now consistently returns 0 — prevents `set -e` exits in cleanup.sh.
+
 ### WebUI Restructure
 - Merged Setup and Maintain pages into single Tools page — 5 nav tabs reduced to 4 for better phone fit.
 - Old `#setup` and `#maintain` URL hashes automatically migrate to `#tools` on first load.
@@ -152,11 +165,25 @@
 
 ### Install Behavior
 - Removed forced `target.sh` execution on module flash — no longer overwrites user's custom target.txt on reinstall.
+- Conflict detection prompt during install — detects bootloader spoofer, HyperCeiler, LuckyTool packages and asks whether to block them at boot.
 
 ### Action Pipeline
 - Replaced monolithic `orchestrator.sh` call in `action.sh` with individually gated feature calls — skipped features log nothing and don't abort the pipeline.
+- `block_rom_spoof_engines` wrapped in background subshell for boot safety.
+
+### Feature Script Improvements
+- `gms.sh`: DroidGuard process kill by name pattern — kills droidguard processes even if their packages aren't listed.
+- `target.sh`: TEESimulator detection refactored to use `_is_teesimulator` helper instead of fragile module.prop author parsing.
+- `boot_hash.sh`: persists computed boot hash via `cfg_set stored_boot_hash`.
+- `package_list.sh`: `GMS_KILL_LIST` deduplicated and reorganized — removed redundant entries, added safetycore.
+- `disable_bootloader_spoofer` respects user's install-time conflict choice flag.
 
 ### Documentation
 - Added Legal disclaimer — educational purposes only, no liability for misuse.
 - Added Warning section — outlines risks (warranty void, boot loops, app bans, etc.).
 - Added Support section with Ko-fi, PayPal, BTC, and ETC donation options.
+- Added `docs/CONFLICTS.md` — conflict handling policy with per-module resolution table.
+
+### Other
+- README simplified — replaced verbose background with quick start, streamlined features list, added screenshot grid.
+- Removed CI badge from README.

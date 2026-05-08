@@ -43,6 +43,7 @@ fi
 ensure_dir "$(dirname "$BOOT_HASH_FILE")"
 echo "$_boot_hash" > "$BOOT_HASH_FILE" || die "Write failed: $BOOT_HASH_FILE"
 chmod 644 "$BOOT_HASH_FILE" 2>/dev/null || true
+cfg_set "stored_boot_hash" "$_boot_hash"
 
 resetprop -n ro.boot.vbmeta.digest "$_boot_hash" 2>/dev/null || log "BOOT_HASH" "Failed to set vbmeta.digest"
 log "BOOT_HASH" "vbmeta.digest = $_boot_hash"

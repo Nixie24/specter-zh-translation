@@ -56,4 +56,17 @@ if [ -f "$SPECTER_DIR/persist_backup.txt" ]; then
   log "UNINSTALL" "Restored persistent props"
 fi
 
+# Restore conflict backups — return renamed scripts to their modules
+if [ -f "$SPECTER_DIR/conflict_backups.txt" ]; then
+  while IFS= read -r _bak_path; do
+    [ -z "$_bak_path" ] && continue
+    if [ -f "${_bak_path}.bak" ]; then
+      mv "${_bak_path}.bak" "$_bak_path" 2>/dev/null || true
+      log "UNINSTALL" "Restored conflict backup: $_bak_path"
+    fi
+  done < "$SPECTER_DIR/conflict_backups.txt"
+  rm -f "$SPECTER_DIR/conflict_backups.txt" 2>/dev/null
+  log "UNINSTALL" "All conflict backups restored"
+fi
+
 return 0

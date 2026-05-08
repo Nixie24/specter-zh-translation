@@ -225,6 +225,7 @@ $(resetprop 2>/dev/null | grep -oE 'ro.*\.build\.tags' | grep -v 'ro.build.tags'
 PROPS
 
     [ "$(getprop ro.boot.selinux 2>/dev/null)" = "enforcing" ] && check_prop "ro.build.selinux" "1"
+    return 0
 }
 
 apply_boot_hardening() {
@@ -245,6 +246,84 @@ apply_boot_hardening() {
 
 ensure_dir() { mkdir -p "$1" 2>/dev/null; }
 
+# Data-driven boot prop application — single source of truth
+apply_boot_props() {
+  # 2-arg props: sp_try <prop> <value>
+  while IFS='|' read -r _abp_prop _abp_val; do
+    [ -z "$_abp_prop" ] && continue
+    case "$_abp_prop" in
+      ro.*.build.type)
+        while IFS= read -r _abp_match; do
+          [ -z "$_abp_match" ] && continue
+          sp_try "$_abp_match" "user"
+        done <<MATCHES
+$(resetprop 2>/dev/null | grep -oE 'ro.*\.build\.type' | grep -v 'ro.build.type' || true)
+MATCHES
+        ;;
+      ro.*.build.tags)
+        while IFS= read -r _abp_match; do
+          [ -z "$_abp_match" ] && continue
+          sp_try "$_abp_match" "release-keys"
+        done <<MATCHES
+$(resetprop 2>/dev/null | grep -oE 'ro.*\.build\.tags' | grep -v 'ro.build.tags' || true)
+MATCHES
+        ;;
+      *)
+        sp_try "$_abp_prop" "$_abp_val"
+        ;;
+    esac
+  done << PROPS
+ro.boot.selinux|enforcing
+ro.build.selinux|1
+ro.secure|1
+ro.adb.secure|1
+ro.debuggable|0
+ro.force.debuggable|0
+ro.kernel.qemu|0
+ro.boot.qemu|0
+ro.crypto.state|encrypted
+ro.hardware.virtual_device|0
+ro.build.type|user
+ro.build.tags|release-keys
+ro.*.build.type|user
+ro.*.build.tags|release-keys
+ro.boot.verifiedbootstate|green
+vendor.boot.verifiedbootstate|green
+ro.boot.vbmeta.device_state|locked
+vendor.boot.vbmeta.device_state|locked
+ro.boot.flash.locked|1
+ro.boot.veritymode|enforcing
+ro.boot.veritymode.managed|yes
+ro.boot.vbmeta.avb_version|2.0
+ro.boot.vbmeta.hash_alg|sha256
+ro.warranty_bit|0
+ro.boot.warranty_bit|0
+ro.vendor.warranty_bit|0
+ro.vendor.boot.warranty_bit|0
+ro.is_ever_orange|0
+ro.secureboot.lockstate|locked
+ro.boot.realme.lockstate|1
+ro.boot.realmebootstate|green
+sys.oem_unlock_allowed|0
+ro.oem_unlock_supported|0
+sys.usb.config|mtp
+sys.usb.adb.disabled|1
+persist.sys.usb.config|none
+service.adb.root|0
+PROPS
+
+  # Recovery mode props — 3-arg: check if contains "recovery", set to "unknown"
+  _abp_rprops="ro.bootmode ro.boot.bootmode vendor.boot.bootmode ro.boot.mode"
+  for _abp_rp in $_abp_rprops; do
+    sp_try "$_abp_rp" recovery unknown
+  done
+  unset _abp_rp _abp_rprops
+}
+
+_is_teesimulator() {
+  [ -f "/data/adb/tricky_store/spoof_build_vars" ]
+}
+
 _escape_json() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
 
 version_ge() {
@@ -259,32 +338,32 @@ version_ge() {
 }
 
 disable_rom_spoof_engines() {
-  _gms="$GMS_PROPS_FILE"
   _detected=false
+  resetprop 2>/dev/null | grep -qE 'persist\.sys\.(pihooks|entryhooks|pixelprops)' && _detected=true
+  [ -f "$GMS_PROPS_FILE" ] && _detected=true
+  [ "$_detected" = "false" ] && unset _detected && return 0
 
-  if resetprop 2>/dev/null | grep -qE 'persist\.sys\.(pihooks|entryhooks|pixelprops)'; then
-    _detected=true
-  fi
-  [ -f "$_gms" ] && _detected=true
+  # Data-driven spoof engine disable map
+  while IFS='|' read -r _dre_prop _dre_val; do
+    resetprop 2>/dev/null | grep -q "$_dre_prop" || sp_persist "$_dre_prop" "$_dre_val"
+  done << MAP
+persist.sys.pihooks.first_api_level|
+persist.sys.pihooks.security_patch|
+MAP
 
-  if [ "$_detected" = "false" ]; then
-    unset _gms _detected
-    return 0
-  fi
+  while IFS='|' read -r _dre_prop _dre_val; do
+    sp_persist "$_dre_prop" "$_dre_val"
+  done << MAP
+persist.sys.pihooks.disable.gms_props|true
+persist.sys.pihooks.disable.gms_key_attestation_block|true
+persist.sys.entryhooks_enabled|false
+persist.sys.pixelprops.gms|false
+persist.sys.pixelprops.gapps|false
+persist.sys.pixelprops.google|false
+persist.sys.pixelprops.pi|false
+MAP
 
-  for _hook in persist.sys.pihooks.first_api_level persist.sys.pihooks.security_patch; do
-    resetprop 2>/dev/null | grep -q "$_hook" || sp_persist "$_hook" ""
-  done
-
-  sp_persist persist.sys.pihooks.disable.gms_props true
-  sp_persist persist.sys.pihooks.disable.gms_key_attestation_block true
-  sp_persist persist.sys.entryhooks_enabled false
-  sp_persist persist.sys.pixelprops.gms false
-  sp_persist persist.sys.pixelprops.gapps false
-  sp_persist persist.sys.pixelprops.google false
-  sp_persist persist.sys.pixelprops.pi false
-
-  if [ -f "$_gms" ] && [ "$(resetprop persist.sys.spoof.gms 2>/dev/null)" != "false" ]; then
+  if [ -f "$GMS_PROPS_FILE" ] && [ "$(resetprop persist.sys.spoof.gms 2>/dev/null)" != "false" ]; then
     resetprop persist.sys.spoof.gms false
   fi
 
@@ -295,7 +374,7 @@ disable_rom_spoof_engines() {
 $(getprop 2>/dev/null | grep -E "pihook|pixelprops" | sed "s/^\[\(.*\)\]:.*/\1/" || true)
 PROPS
 
-  unset _gms _detected _hook _prop
+  unset _detected _dre_prop _dre_val _prop
 }
 
 STD_ALPHABET="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -311,10 +390,11 @@ read_vbmeta() {
   _rv_slot=$(getprop ro.boot.slot_suffix 2>/dev/null || echo "")
   _rv_dev="/dev/block/by-name/vbmeta${_rv_slot}"
   [ -b "$_rv_dev" ] || return 1
+  _rv_info=$(dd if="$_rv_dev" bs=1M 2>/dev/null | sha256sum 2>/dev/null) || return 1
+  _rv_digest="${_rv_info%% *}"
   _rv_size=$(blockdev --getsize64 "$_rv_dev" 2>/dev/null) || return 1
-  _rv_digest=$(sha256sum "$_rv_dev" 2>/dev/null | awk '{print $1}') || return 1
   echo "$_rv_size $_rv_digest"
-  unset _rv_slot _rv_dev _rv_size _rv_digest
+  unset _rv_slot _rv_dev _rv_info _rv_digest _rv_size
 }
 
 run_device_info() {
@@ -406,41 +486,230 @@ resolve_module_root() {
 }
 
 block_rom_spoof_engines() {
-  if resetprop 2>/dev/null | grep -qE 'persist\.sys\.(pihooks|entryhooks|pixelprops)' || [ -f /data/system/gms_certified_props.json ]; then
-    for _hook in persist.sys.pihooks.first_api_level persist.sys.pihooks.security_patch; do
-      resetprop 2>/dev/null | grep -q "$_hook" || sp_persist "$_hook" ""
-    done
-    unset _hook
-    sp_persist persist.sys.pihooks.disable.gms_props true
-    sp_persist persist.sys.pihooks.disable.gms_key_attestation_block true
-    sp_persist persist.sys.entryhooks_enabled false
-    sp_persist persist.sys.pixelprops.gms false
-    sp_persist persist.sys.pixelprops.gapps false
-    sp_persist persist.sys.pixelprops.google false
-    sp_persist persist.sys.pixelprops.pi false
-    if [ -f /data/system/gms_certified_props.json ] && [ "$(resetprop persist.sys.spoof.gms 2>/dev/null)" != "false" ]; then
-      resetprop persist.sys.spoof.gms false 2>/dev/null || true
-    fi
+  _brs_gate=false
+  resetprop 2>/dev/null | grep -qE 'persist\.sys\.(pihooks|entryhooks|pixelprops)' && _brs_gate=true
+  [ -f "$GMS_PROPS_FILE" ] && _brs_gate=true
+  [ "$_brs_gate" = "false" ] && unset _brs_gate && return 0
+
+  # Init missing persist props only (don't overwrite existing)
+  for _brs_hook in persist.sys.pihooks.first_api_level persist.sys.pihooks.security_patch; do
+    resetprop 2>/dev/null | grep -q "$_brs_hook" || sp_persist "$_brs_hook" ""
+  done
+  unset _brs_hook
+
+  # Data-driven map for unconditional spoof engine blocks
+  while IFS='|' read -r _brs_prop _brs_val; do
+    sp_persist "$_brs_prop" "$_brs_val"
+  done << MAP
+persist.sys.pihooks.disable.gms_props|true
+persist.sys.pihooks.disable.gms_key_attestation_block|true
+persist.sys.entryhooks_enabled|false
+persist.sys.pixelprops.gms|false
+persist.sys.pixelprops.gapps|false
+persist.sys.pixelprops.google|false
+persist.sys.pixelprops.pi|false
+MAP
+
+  if [ -f "$GMS_PROPS_FILE" ] && [ "$(resetprop persist.sys.spoof.gms 2>/dev/null)" != "false" ]; then
+    resetprop persist.sys.spoof.gms false 2>/dev/null || true
   fi
+
+  unset _brs_gate _brs_prop _brs_val
 }
 
 disable_bootloader_spoofer() {
-  _conflict_flag="/data/adb/Specter/conflict_choice"
-  if [ -f "$_conflict_flag" ] && grep -q "disabled" "$_conflict_flag" 2>/dev/null; then
-    unset _conflict_flag
-    return 0
+  if command -v cmd >/dev/null 2>&1; then
+    if pm list packages 2>/dev/null | grep -q "es.chiteroman.bootloaderspoofer"; then
+      cmd package uninstall --user 0 "es.chiteroman.bootloaderspoofer" >/dev/null 2>&1 || true
+    fi
+    cmd appops set com.wmods.wppenhacer POST_NOTIFICATIONS deny 2>/dev/null || true
+  else
+    # Fallback for older Android — use pm + sed
+    for _pkg in es.chiteroman.bootloaderspoofer; do
+      if grep -q "$_pkg" /data/system/packages.list 2>/dev/null; then
+        timeout 5 pm uninstall --user 0 "$_pkg" >/dev/null 2>&1 || true
+      fi
+    done
+    unset _pkg
+    _wpp_xml="/data/data/com.wmods.wppenhacer/shared_prefs/com.wmods.wppenhacer_preferences.xml"
+    if [ -f "$_wpp_xml" ] && grep -q 'name="bootloader_spoofer" value="true"' "$_wpp_xml" 2>/dev/null; then
+      sed -i 's/\(name="bootloader_spoofer" value=\)"true"/\1"false"/' "$_wpp_xml" 2>/dev/null || true
+    fi
+    unset _wpp_xml
   fi
-  unset _conflict_flag
-  _spoofers="es.chiteroman.bootloaderspoofer com.sevtinge.hyperceiler com.luckyzyx.luckytool"
-  for _pkg in $_spoofers; do
-    if grep -q "$_pkg" /data/system/packages.list 2>/dev/null; then
-      timeout 5 pm uninstall --user 0 "$_pkg" >/dev/null 2>&1 || true
+}
+
+CONFLICT_BACKUP_FILE="/data/adb/Specter/conflict_backups.txt"
+
+_conflict_registry() {
+  cat <<'EOF'
+zygisk_nohello|NoHello|/data/adb/modules/zygisk_nohello/service.sh|boot_hardening,boot_hash,security_patch,suspicious_props,lsposed,rom_spoof,bootloader_spoofer
+tsupport-advance|TSupport-Advance|/data/adb/modules/tsupport-advance/post-fs-data.sh,/data/adb/modules/tsupport-advance/service.sh|boot_hardening,boot_hash,security_patch,suspicious_props,lsposed,rom_spoof,bootloader_spoofer,target
+vbmeta-fixer|VBMeta-Fixer|/data/adb/modules/vbmeta-fixer/service.sh|boot_hash
+treat_wheel|TreatWheel|/data/adb/modules/treat_wheel/service.sh,/data/adb/modules/treat_wheel/service-or-boot-completed.sh|boot_hardening,rom_spoof,suspicious_props
+EOF
+}
+
+_conflict_detect() {
+  _cd_modid="$1"
+  [ -d "/data/adb/modules/$_cd_modid" ] || [ -d "/data/adb/modules_update/$_cd_modid" ]
+}
+
+_conflict_choice() {
+  _cc_key="$1"
+  cfg_get "conflict_$_cc_key" "priority_specter"
+}
+
+_conflict_rename_bak() {
+  _cr_path="$1"
+  [ -f "$_cr_path" ] || return 0
+  [ -f "$_cr_path.bak" ] && return 0
+  mv "$_cr_path" "$_cr_path.bak" 2>/dev/null || true
+  echo "$_cr_path" >> "$CONFLICT_BACKUP_FILE" 2>/dev/null || true
+}
+
+_conflict_restore_bak() {
+  _cr_path="$1"
+  [ -f "$_cr_path.bak" ] || return 0
+  mv "$_cr_path.bak" "$_cr_path" 2>/dev/null || true
+}
+
+_conflict_apply_scripts() {
+  _cas_scripts="$1"
+  _cas_choice="$2"
+  _cas_old_ifs="$IFS"
+  IFS=','
+  for _cas_script in $_cas_scripts; do
+    [ -z "$_cas_script" ] && continue
+    if [ "$_cas_choice" = "priority_module" ]; then
+      _conflict_restore_bak "$_cas_script"
+    else
+      _conflict_rename_bak "$_cas_script"
     fi
   done
-  unset _pkg
-  _wpp_xml="/data/data/com.wmods.wppenhacer/shared_prefs/com.wmods.wppenhacer_preferences.xml"
-  if [ -f "$_wpp_xml" ] && grep -q 'name="bootloader_spoofer" value="true"' "$_wpp_xml" 2>/dev/null; then
-    sed -i 's/\(name="bootloader_spoofer" value=\)"true"/\1"false"/' "$_wpp_xml" 2>/dev/null || true
-  fi
-  unset _wpp_xml
+  IFS="$_cas_old_ifs"
+  unset _cas_scripts _cas_choice _cas_old_ifs _cas_script
+}
+
+migrate_conflict_config() {
+  _mc_old_dir="/data/adb/Specter/config"
+  [ -d "$_mc_old_dir" ] || return 0
+  while IFS='|' read -r _mc_id _mc_name _mc_scripts _mc_features; do
+    [ -z "$_mc_id" ] && continue
+    _mc_old_file="$_mc_old_dir/conflict_$_mc_id.val"
+    [ -f "$_mc_old_file" ] || continue
+    _mc_current=$(cfg_get "conflict_$_mc_id" "__specter_unset__")
+    if [ "$_mc_current" = "__specter_unset__" ]; then
+      _mc_old_val=$(cat "$_mc_old_file" 2>/dev/null | tr -d '\r\n')
+      case "$_mc_old_val" in
+        priority_specter|priority_module) cfg_set "conflict_$_mc_id" "$_mc_old_val" ;;
+      esac
+    fi
+  done <<EOF
+$(_conflict_registry)
+EOF
+  unset _mc_old_dir _mc_id _mc_name _mc_scripts _mc_features _mc_old_file _mc_current _mc_old_val
+}
+
+resolve_conflicts() {
+  ensure_dir "$SPECTER_DIR"
+  touch "$CONFLICT_BACKUP_FILE" 2>/dev/null || true
+
+  migrate_conflict_config
+
+  # Always block BootloaderSpoofer — archived since 2024
+  disable_bootloader_spoofer
+
+  # === PASS 1: Process all script renames/restores (independent per module) ===
+  while IFS='|' read -r _rc_id _rc_name _rc_scripts _rc_features; do
+    [ -z "$_rc_id" ] && continue
+    _conflict_detect "$_rc_id" || continue
+    _rc_choice="$(_conflict_choice "$_rc_id")"
+    _conflict_apply_scripts "$_rc_scripts" "$_rc_choice"
+    log "CONFLICT" "$_rc_name: $_rc_choice"
+  done <<EOF
+$(_conflict_registry)
+EOF
+  unset _rc_id _rc_name _rc_scripts _rc_features _rc_choice
+
+  # === PASS 2: Apply conflict toggles (disable only) ===
+  apply_conflict_toggles
+}
+
+# Check if ANY installed conflicting module with priority_module claims a feature
+_conflict_claimed() {
+  _cc_feature="$1"
+  _cc_claimed=1
+  while IFS='|' read -r _cc_id _cc_name _cc_scripts _cc_features; do
+    [ -z "$_cc_id" ] && continue
+    _conflict_detect "$_cc_id" || continue
+    [ "$(_conflict_choice "$_cc_id")" = "priority_module" ] || continue
+    case ",$_cc_features," in
+      *",$_cc_feature,"*) _cc_claimed=0; break ;;
+    esac
+  done <<EOF
+$(_conflict_registry)
+EOF
+  unset _cc_id _cc_name _cc_scripts _cc_features
+  return $_cc_claimed
+}
+
+# Recalculate all Specter toggles based on current conflict priorities
+# Called by WebUI after changing a single module's priority
+apply_conflict_toggles() {
+  if _conflict_claimed "boot_hardening"; then cfg_set toggle_boot_hardening 0; else cfg_set toggle_boot_hardening 1; fi
+  if _conflict_claimed "boot_hash"; then cfg_set toggle_boot_hash 0; else cfg_set toggle_boot_hash 1; fi
+  if _conflict_claimed "security_patch"; then cfg_set toggle_security_patch 0; else cfg_set toggle_security_patch 1; fi
+  if _conflict_claimed "suspicious_props"; then cfg_set toggle_suspicious_props 0; else cfg_set toggle_suspicious_props 1; fi
+  if _conflict_claimed "lsposed"; then cfg_set toggle_lsposed 0; else cfg_set toggle_lsposed 1; fi
+  if _conflict_claimed "rom_spoof"; then cfg_set toggle_rom_spoof 0; else cfg_set toggle_rom_spoof 1; fi
+  if _conflict_claimed "bootloader_spoofer"; then cfg_set toggle_bootloader_spoofer 0; else cfg_set toggle_bootloader_spoofer 1; fi
+  if _conflict_claimed "target"; then cfg_set toggle_target 0; else cfg_set toggle_target 1; fi
+}
+
+conflict_status_json() {
+  migrate_conflict_config
+  _cs_first=1
+  printf '['
+  while IFS='|' read -r _cs_id _cs_name _cs_scripts _cs_features; do
+    [ -z "$_cs_id" ] && continue
+    _conflict_detect "$_cs_id" || continue
+    _cs_choice="$(_conflict_choice "$_cs_id")"
+    _cs_priority=true
+    [ "$_cs_choice" = "priority_module" ] && _cs_priority=false
+    _cs_name_json="$(_escape_json "$_cs_name")"
+    if [ "$_cs_first" -eq 0 ]; then printf ','; else _cs_first=0; fi
+    printf '{"key":"%s","friendlyName":"%s","detected":true,"prioritySpecter":%s}' "$_cs_id" "$_cs_name_json" "$_cs_priority"
+  done <<EOF
+$(_conflict_registry)
+EOF
+  printf ']'
+  unset _cs_first _cs_id _cs_name _cs_scripts _cs_features _cs_choice _cs_priority _cs_name_json
+}
+
+conflict_set_choice() {
+  _csc_key="$1"
+  _csc_choice="$2"
+  case "$_csc_choice" in
+    priority_specter|priority_module) ;; *) return 1 ;;
+  esac
+  migrate_conflict_config
+  ensure_dir "$SPECTER_DIR"
+  touch "$CONFLICT_BACKUP_FILE" 2>/dev/null || true
+  _csc_found=1
+  while IFS='|' read -r _csc_id _csc_name _csc_scripts _csc_features; do
+    [ -z "$_csc_id" ] && continue
+    [ "$_csc_id" = "$_csc_key" ] || continue
+    _csc_found=0
+    cfg_set "conflict_$_csc_id" "$_csc_choice"
+    if _conflict_detect "$_csc_id"; then
+      _conflict_apply_scripts "$_csc_scripts" "$_csc_choice"
+    fi
+    apply_conflict_toggles
+    break
+  done <<EOF
+$(_conflict_registry)
+EOF
+  unset _csc_key _csc_choice _csc_id _csc_name _csc_scripts _csc_features
+  return $_csc_found
 }

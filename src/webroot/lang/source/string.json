@@ -165,4 +165,7 @@
   "control_toggle_action_boot_hash_desc": "Read and write verified boot hash for attestation",
   "control_toggle_action_pif": "Set Fingerprint (PIF)",
   "control_toggle_action_pif_desc": "Run Play Integrity Fix auto-update scripts",
+
+  "control_conflicts_title": "Conflict Resolution",
+  "control_conflicts_desc": "Toggle ON = module handles it. Toggle OFF = Specter handles it. Remove conflicting modules from your root manager if you encounter issues."
 }

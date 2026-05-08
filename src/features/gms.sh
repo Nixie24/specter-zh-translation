@@ -11,6 +11,13 @@ log "GMS" "Start"
 _installed_pkgs=$(pm list packages 2>/dev/null) || log "GMS" "Warning: Failed to list installed packages"
 _count=0
 
+# Kill known droidguard processes by name pattern (regardless of install status)
+for _pid in $(pgrep -f 'droidguard\|com\.google\.android\.gms\b' 2>/dev/null); do
+  kill -9 "$_pid" 2>/dev/null || true
+  _count=$((_count + 1))
+done
+unset _pid
+
 for _pkg in $GMS_KILL_LIST; do
   echo "$_installed_pkgs" | grep -Fq "package:$_pkg" || continue
   log "GMS" "Force-stopping $_pkg"

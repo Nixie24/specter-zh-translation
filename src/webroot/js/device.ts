@@ -158,3 +158,22 @@ export async function saveSmartmergeContent(content: string) {
   const b64 = (result as any).stdout || '';
   await exec(`mkdir -p /sdcard/Specter && printf '%s' "${b64}" | base64 -d > /sdcard/Specter/customize.txt`);
 }
+
+interface ConflictModule {
+  key: string;
+  friendlyName: string;
+  detected: boolean;
+  prioritySpecter: boolean; // true = Specter handles it, false = module handles it
+}
+
+export async function refreshConflictStatus(): Promise<ConflictModule[]> {
+  try {
+    const result = await runScript('conflicts.sh', 'common');
+    const raw = result.output || result.rawOutput || '[]';
+    const parsed = JSON.parse(raw) as ConflictModule[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn('Conflict status failed:', e);
+    return [];
+  }
+}
