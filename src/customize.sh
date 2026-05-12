@@ -1,5 +1,6 @@
 # shellcheck shell=sh
-MODDIR="$MODPATH"  # used by sourced libs
+# shellcheck disable=SC2034
+MODDIR="$MODPATH"
 . "$MODPATH/lib/common.sh"
 . "$MODPATH/lib/urls.sh"
 . "$MODPATH/lib/paths.sh"
