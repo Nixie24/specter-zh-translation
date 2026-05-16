@@ -2,13 +2,49 @@
 
 ## v1.3.3
 
-### Fix PIF Detection — Restored & Consolidated
+### TEE Check — App-Level Attestation (One-Time)
+
+- **New one-time TEE check** — `customize.sh` downloads a tiny ContentProvider APK (8.4KB) from rawbin, installs it, runs the **same attestation check as TEESimulator-RS** (`KeyPairGenerator` + `setAttestationChallenge` in Android Keystore), caches the result to `/data/adb/Specter/tee_status`, then uninstalls and deletes the APK. Only runs once — never again after caching.
+- **Result moved to Specter dir** — `TEE_STATUS` changed from `$TRICKY_DIR/tee_status` to `$SPECTER_DIR/tee_status`. Works standalone without Tricky Store. `device-info.sh` and `target.sh` both read the cached file.
+- **APK reused if already installed** — `customize.sh` checks if the package is installed before downloading. Skips download + install if it's already there from a previous run (e.g., failed cleanup).
+- **No Tricky Store file fallback** — removed stale file reads from `/data/adb/tricky_store/tee_status*` that caused false `TEE: broken` from old DEX tests.
+- **Precise targeting** — `target.sh` reads the cached TEE status to decide `?` vs bare suffix per app. Broken TEE → apps get `?` (generate fallback). Also cleaned up to only read `$TEE_STATUS`, no longer checks old `.txt` variants.
+- **`tee_check` binaries removed** — all C binaries, Java DEX, and build scripts for `bin/tee_check/` deleted. Saved ~20KB from the module zip.
+
+### Installer — Module Detection Overhaul
+
+- **Tricky Store variant detection** — now reads `module.prop` `name=` to distinguish between TrickyStore (original), TEESimulator, and TEESimulator-RS. Shows the exact variant name during install.
+- **Play Integrity Fix detection** — reads PIF's `module.prop` `name=` during install and prints it. Silently skips IntegrityBox (which uses `id=playintegrityfix` but is distinguished by its `/data/adb/Box-Brain/` marker).
+- **Root detection consolidated** — removed duplicate inline detection from `device-info.sh`. `detect_root_solution()` in `common.sh` is now the single source of truth, sets both `$ROOT_SOL` (generic: `magisk`/`kernelsu`) and `$ROOT_TYPE` (detailed: `SukiSU-Ultra`/`KernelSU-Next`). Both `customize.sh` and `device-info.sh` use the same function.
+- **Output order cleaned** — "Checking device info..." now prints FIRST during install, before root/module detection. TEE check downloads no longer show separate "Success" lines.
 
 - **Restored "Fix PIF Detection" button** in Tools page — re-added `pif2.sh` feature script, webui bridge, UI card, and all 5 language translations. The button was removed in v1.3.0 with the claim that boot-time `block_rom_spoof_engines` made it redundant.
 - **Root cause**: the boot function only set guard persist props (preventative) but never deleted existing spoof engine traces. Active `pihook`/`pixelprops` properties from ROM-level spoof engines remained in memory and were still detectable.
 - **Moved active deletion into `block_rom_spoof_engines()`** (`common.sh`): the shared library function now also removes existing `pihook`/`pixelprops` properties via `resetprop -p --delete`. This runs at boot AND when the button is pressed — single source of truth.
 - Boot (`service.sh` / `boot-completed.sh`) and webui button (`pif2.sh`) now call the same `block_rom_spoof_engines()` with identical behavior.
 
+### Conditional Integration — Audit & Refactor
+
+- **Fixed `toggle-lsposed` never running at boot** — was missing from both `service.sh` and `boot-completed.sh` despite having a full feature script, toggle, and conflict management. Added invocation to both boot paths.
+- **Fixed recovery toggle initial state overwrite** — `applyFlags()` from device info set the correct switch state, but `wireControlToggles()` immediately overwrote it from config. Reordered init so device info has final say.
+- **Fixed passive conflict toggles being decorative no-ops** — `_conflict_claimed()` for passive modules always returned "claimed" regardless of the user's priority choice. Now honors `priority_specter` vs `priority_module`.
+- **Fixed `bootloader_spoofer` toggle being a placebo on Magisk** — `resolve_conflicts()` at post-fs-data called `disable_bootloader_spoofer` unconditionally. Now gated behind the toggle. Also added a late-boot call to `service.sh` where `pm`/`cmd` are actually available.
+- **Fixed recovery hiding absent on KSU/APatch** — `hide_recovery_folders()` was only in `service.sh` (Magisk path), missing from `boot-completed.sh`. Added.
+- **Fixed extra boot hardening steps missing on KSU/APatch** — `/proc/cmdline`, `/proc/net/unix`, `install-recovery.sh`, `/system/addon.d` hardening was only in `service.sh`. Added to `boot-completed.sh`.
+- **Unified boot logic into `lib/boot_core.sh`** — single source of truth sourced by both `service.sh` (Magisk) and `boot-completed.sh` (KSU/APatch). Eliminates platform fork drift. Adding a new boot feature means one line in the feature list, not touching 3 files.
+- **Extracted conflict registry to `config/conflicts.txt`** — data file replaces heredoc in `common.sh`. Adding a conflicting module is one line in a text file, no shell code changes.
+- **Added `_feature_should_run()`** — single runtime gate checking both user toggle and conflict claim, used by the unified boot dispatcher.
+- **Moved `toggle-action_keybox` to control page** — was only in `constants.ts` with no HTML element. Now rendered in the Action Pipeline section.
+- **Removed duplicate run-now buttons from Tools page** — `target.sh`, `gms.sh`, `pif.sh` buttons duplicated the action pipeline toggles. Removed. The control page is the single place for pipeline automation.
+- **Fixed broken HTML from dev_options removal** — commit `927b7f3` left orphaned elements and a dangling `</div>` that broke DOM nesting, causing pages to render incorrectly.
+- **Synced config on device state refresh** — `applyFlags()` now calls `cfgSet()` so the persisted config matches the detected device state.
+- **Added conflict resolution test suite** — 14 tests covering all conflict types, toggling, `_feature_should_run()`, JSON output, special detection cases, and idempotency. Runs on any Linux box via `bash tests/test_conflicts.sh`.
+- **Updated `docs/AGENTS.md` boot safety docs** — replaced outdated function names and removed `disable_rom_spoof_engines` references with the current architecture.
+- **Renamed `twrp.sh` → `recovery.sh`** — consistent naming with the toggle. Same `hide_recovery_folders()` call.
+- **Extracted standalone feature scripts** — `boot_hardening.sh`, `bootloader_spoofer.sh`, `rom_spoof.sh` extracted from inline code in `service.sh`/`boot-completed.sh`. All dispatched via `boot_core.sh` now.
+- **Removed self-guards from feature scripts** — `lsposed.sh` and `suspicious_props.sh` no longer check their own toggle at the top. Gating is now centralized in `_feature_should_run()`, avoiding the old pattern where action-pipeline calls would be silently skipped.
+- **Moved `_feature_enabled()` to `common.sh`** — was defined twice (once in `service.sh`, once in `boot-completed.sh`). Now defined once in the shared library.
+- **Split `apply_conflict_toggles()` into two loops** — boot-time and action-pipeline toggles are now set separately. Only `target`, `security_patch`, and `keybox` affect action toggles.
 ## v1.3.2
 
 ### TEE Status Detection Fix

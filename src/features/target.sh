@@ -45,12 +45,7 @@ _TMP_TARGET="${TARGET_TXT}.new.$$"
 trap 'rm -f "$TEMP_PKGS" "${TEMP_PKGS}.filtered" "$_TMP_TARGET"' EXIT
 
 teeBroken="false"
-for _tee_file in "$TEE_STATUS" "${TEE_STATUS}.txt"; do
-  [ -f "$_tee_file" ] || continue
-  teeBroken=$(grep -E '^(teeBroken|tee_broken)=' "$_tee_file" | cut -d= -f2 2>/dev/null || echo "false")
-  break
-done
-unset _tee_file
+[ -f "$TEE_STATUS" ] && teeBroken=$(grep -E '^(teeBroken|tee_broken)=' "$TEE_STATUS" 2>/dev/null | cut -d= -f2 || echo "false")
 log "TARGET" "TEE status: teeBroken=$teeBroken"
 
 BLACKLIST="$SPECTER_DIR/blacklist.txt"

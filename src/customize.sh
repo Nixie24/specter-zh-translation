@@ -31,29 +31,73 @@ ui_print "|____/| .__/ \\___|\\___|\\__\\___|_|   "
 ui_print "      |_|                           "
 ui_print ""
 
+ui_print "- Checking device info..."
 detect_root_solution
-case "$ROOT_SOL" in
-  kernelsu) ui_print "- KernelSU root detected" ;;
-  apatch)   ui_print "- APatch root detected"   ;;
-  magisk)   ui_print "- Magisk root detected"   ;;
-  legacy)   ui_print "- Legacy root detected"   ;;
-esac
+[ "$ROOT_TYPE" != "Unknown" ] && ui_print "- $ROOT_TYPE detected"
 
 _ts_found=false
-if [ -d "/data/adb/modules/tricky_store" ] || [ -d "/data/adb/modules_update/tricky_store" ]; then
-  _ts_found=true
+_ts_name=$(_ts_prop)
+case "$_ts_name" in
+  TEESimulator-RS) _ts_found=true; ui_print "- TEESimulator-RS found" ;;
+  TEESimulator)    _ts_found=true; ui_print "- TEESimulator found" ;;
+  *Tricky*)        _ts_found=true; ui_print "- Tricky Store found" ;;
+  "")              ;;
+  *)               _ts_found=true; ui_print "- $_ts_name found" ;;
+esac
+unset _ts_name
+
+_pif_name=$(_pif_prop)
+[ -n "$_pif_name" ] && ui_print "- $_pif_name found"
+unset _pif_name
+
+# One-time TEE status check — APK attestation
+_tee=
+if [ -f "$TEE_STATUS" ]; then
+  _tee_val=$(grep -E '^(teeBroken|tee_broken)=' "$TEE_STATUS" 2>/dev/null | cut -d= -f2)
+  case "$_tee_val" in
+    true)  _tee="broken" ;;
+    false) _tee="normal" ;;
+  esac
+  unset _tee_val
 fi
+if [ -z "$_tee" ]; then
+  if pm list packages org.specter.teecheck 2>/dev/null | grep -q org.specter.teecheck; then
+    _tee=$(content query --uri content://org.specter.teecheck/check 2>/dev/null \
+      | grep -o 'status=[a-z]*' | cut -d= -f2)
+  elif check_network; then
+    TMP_APK="$MODPATH/teecheck.apk"
+    ( download "$TEE_CHECK_URL" > "$TMP_APK" ) & _dl_pid=$!
+    _dl_i=0; while kill -0 $_dl_pid 2>/dev/null && [ $_dl_i -lt 10 ]; do sleep 1; _dl_i=$((_dl_i + 1)); done
+    kill $_dl_pid 2>/dev/null || true; wait $_dl_pid 2>/dev/null || true
+    if [ -f "$TMP_APK" ] && [ -s "$TMP_APK" ]; then
+      pm install "$TMP_APK" 2>/dev/null && {
+        _tee=$(content query --uri content://org.specter.teecheck/check 2>/dev/null \
+          | grep -o 'status=[a-z]*' | cut -d= -f2)
+        pm uninstall org.specter.teecheck 2>/dev/null || true
+      }
+      rm -f "$TMP_APK"
+    fi
+  else
+    ui_print "  No internet, skipping TEE check"
+  fi
+fi
+case "$_tee" in
+  normal|broken)
+    mkdir -p "$SPECTER_DIR"
+    echo "tee_broken=$([ "$_tee" = "normal" ] && echo false || echo true)" > "$TEE_STATUS"
+    ui_print "- TEE: $_tee"
+    ;;
+esac
+unset _tee _dl_i _dl_pid TMP_APK
 
 if [ "$_ts_found" = true ]; then
-  ui_print "- Tricky Store found"
-
   DECODE_FILE="$TRICKY_DIR/keybox_decode"
   TEMP_FILE="$MODPATH/keybox.tmp"
 
   ui_print ""
   ui_print " Install a keybox?"
-  ui_print "  Vol Up   = Yes"
-  ui_print "  Vol Down = No (defaults to Yes in 5s)"
+  ui_print "  Vol Up   = Yes (5s)"
+  ui_print "  Vol Down = No"
   ui_print ""
 
   _vol; _choice=$?
@@ -111,8 +155,8 @@ unset _ts_found
 
 ui_print ""
 ui_print " Generate target.txt?"
-ui_print "  Vol Up   = Yes"
-ui_print "  Vol Down = No (defaults to Yes in 5s)"
+ui_print "  Vol Up   = Yes (5s)"
+ui_print "  Vol Down = No"
 ui_print ""
 _vol; _tg_choice=$?
 case $_tg_choice in

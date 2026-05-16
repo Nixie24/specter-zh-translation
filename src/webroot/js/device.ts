@@ -54,7 +54,6 @@ function applyFlags(flags: { twrp?: boolean }) {
   if (!flags) return;
   const recoverySwitch = document.getElementById('toggle-recovery') as any;
   if (recoverySwitch) recoverySwitch.selected = !!flags.twrp;
-  cfgSet('toggle_recovery', flags.twrp ? '1' : '0');
 }
 
 function applyKeyboxFormat(format: string) {
