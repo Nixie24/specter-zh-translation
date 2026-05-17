@@ -11,7 +11,7 @@ unset ASH_STANDALONE
 . "$MODDIR/lib/config_env.sh"
 
 _action_feature_enabled() {
-  local key="$1" default="${2:-1}"
+  key="$1" default="${2:-1}"
   [ "$(cfg_get "$key" "$default")" != "0" ]
 }
 

@@ -39,8 +39,8 @@ If Specter helps you out, consider supporting the project:
 ## Features
 
 - **Keybox**: multi-source catalog, custom keybox (file/URL/path), Google revocation checking, private keybox support, backup and restore
-- **Tools**: target.txt, App Targeting (per-app states + blacklist), security patch, TEESimulator support, GMS kill, PIF fix, HMA-OSS / Zygisk Next / RKA configs, detection cleanup, Widevine L1
-- **Control**: per-feature toggles (boot hardening, bootloader spoofer block, ROM spoof blocking, LSPosed clean, recovery hide, action pipeline steps), automatic conflict resolution (aggressive: TSupport-Advance/Yurikey/Integrity Box disabled; passive: TreatWheel/NoHello/Sensitive Props coexist)
+- **Tools**: target.txt, App Targeting (per-app states + blacklist), security patch with live fetch from source.android.com, TEESimulator support, GMS kill, PIF fix, HMA-OSS / Zygisk Next / RKA configs, detection cleanup, Widevine L1
+- **Control**: per-feature toggles (boot hardening, boot state props, bootloader spoofer block, ROM spoof blocking, LSPosed clean, recovery hide, action pipeline steps), automatic conflict resolution (aggressive: TSupport-Advance/Yurikey/Integrity Box disabled; passive: TreatWheel/NoHello/Sensitive Props coexist)
 - **Settings**: theme (dark/light/auto + 9 color presets + Monet), language, dev mode with terminal, project contributors
 
 ## Requirements
@@ -76,6 +76,14 @@ NOTHING IS 100% GUARANTEED. USE AT YOUR OWN RISK.
 YOUR WARRANTY MAY BE VOIDED, APPS MAY BREAK, AND ACCOUNT BANS ARE POSSIBLE.
 ALWAYS MAINTAIN BACKUPS OF IMPORTANT DATA.
 ```
+
+## Thanks
+
+- [chiteroman](https://github.com/chiteroman/PlayIntegrityFix), [KOWX712](https://github.com/KOWX712/PlayIntegrityFix) and [osm0sis](https://github.com/osm0sis/PlayIntegrityFork) — pif.ts and its forks
+- [vvb2060](https://github.com/vvb2060/KeyAttestation) — KeyAttestation
+- [5ec1cff](https://github.com/5ec1cff/TrickyStore), [JingMatrix](https://github.com/JingMatrix/TEESimulator) and [Enginex0](https://github.com/Enginex0/TEESimulator-RS) — Tricky Store and its forks
+- [KOWX712](https://github.com/KOWX712/Tricky-Addon-Update-Target-List) — Tricky Store Addon
+- [Citra-Standalone](https://github.com/Citra-Standalone/TSupport-Advance) — TSupport-Advance
 
 ## License
 

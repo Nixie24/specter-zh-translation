@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # Unified boot logic for both Magisk (via service.sh) and KSU/APatch (via boot-completed.sh).
 # Sourced after sys.boot_completed=1 and basic common libs are loaded.
 # Single source of truth for all boot-time features — no more platform fork drift.
