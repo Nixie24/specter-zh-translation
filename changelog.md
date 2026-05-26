@@ -26,7 +26,10 @@
 - `Promise.all` for refresh button — device, keybox, and catalog fetch in parallel
 - Catalog analysis moved to browser `fetch()` — parallel catalog + Google revocation check
 - Enriched keybox data written back to disk + description refreshed after analysis
-- Network chip: hardcoded green/red with dark variants (accessibility win)
+- Network chip uses hardcoded MD3 reference colors (green/red) for unambiguous readability across Monet themes
+- Global `user-select: none` prevents accidental text selection on mobile (with input/contenteditable exceptions)
+- App Targeting overlay back button correctly routed via `history.back()` — no longer triggers global nav
+- Copy buttons for terminal output and activity history entries (one-tap with toast feedback)
 - `decodeURI` → `decodeURIComponent` bug fix for contributor links
 - Responsive contributors grid (`auto-fit` instead of fixed `1fr 1fr`)
 - `data-i18n` attributes on preset chips (declarative translation)
@@ -45,7 +48,7 @@
 - Deployed via Cloudflare Pages at [specter.dpejoh.com](https://specter.dpejoh.com)
 
 ## Contributors
-- @myst-25 — architecture review and recommendations
+- @myst-25 — architecture review, recommendations, and UI/UX improvements (PR #4)
 
 # v1.4.1
 
