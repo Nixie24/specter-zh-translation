@@ -106,6 +106,17 @@ function wireRefreshButton() {
   if (!btn) return;
   btn.addEventListener('click', async () => {
     btn.disabled = true;
+    const moddir = getModuleDir();
+    if (moddir) {
+      cfgSet('kb_custom_type', '');
+      cfgSet('kb_custom_value', '');
+      await exec(`sh ${shellEscape(moddir + '/features/keybox.sh')}`)
+        .catch(() => {});
+      await exec(`sh ${shellEscape(moddir + '/features/keybox_info.sh')}`)
+        .catch(() => {});
+      await exec(`sh ${shellEscape(moddir + '/refresh_desc.sh')}`)
+        .catch(() => {});
+    }
     await Promise.all([
       refreshDevice(),
       refreshKeyboxStatus(),
