@@ -11,8 +11,8 @@ export function openAutoTargetDialog() {
   const dialog = document.createElement('md-dialog');
   dialog.id = 'auto-target-dialog';
 
-  cfgGet('toggle_auto_target', '0').then(enabled => {
-    cfgGet('auto_target_interval', '15').then(interval => {
+  cfgGet('toggle_auto_target', '1').then(enabled => {
+    cfgGet('auto_target_interval', '300').then(interval => {
       dialog.innerHTML = `
         <div slot="headline">
           <div class="at-dialog-headline">
@@ -49,7 +49,7 @@ export function openAutoTargetDialog() {
                 value="${interval}"
                 class="at-interval-field"
                 style="text-align:center"
-                aria-label="Interval in seconds"
+                aria-label="${t('auto_target_interval_aria', 'Interval in seconds')}"
               ></md-outlined-text-field>
             </div>
           </div>
@@ -85,18 +85,13 @@ export function openAutoTargetDialog() {
         }
 
         try {
-          const oldEnabled = await cfgGet('toggle_auto_target', '0');
+          const oldEnabled = await cfgGet('toggle_auto_target', '1');
           cfgSet('toggle_auto_target', newEnabled);
           cfgSet('auto_target_interval', String(clampedInterval));
 
-          if (modDir) {
-            if (newEnabled === '1' && oldEnabled !== '1') {
-              await exec(`sh ${shellEscape(modDir + '/features/auto_target.sh')} >/dev/null 2>&1 &`);
-              appendToOutput('[AUTO_TARGET] Daemon started via UI');
-            } else if (newEnabled === '0' && oldEnabled === '1') {
-              await exec(`pkill -f "${shellEscape(modDir + '/features/auto_target.sh')}" 2>/dev/null || true`);
-              appendToOutput('[AUTO_TARGET] Daemon stopped via UI');
-            }
+          if (modDir && newEnabled === '1' && oldEnabled !== '1') {
+            await exec(`sh ${shellEscape(modDir + '/features/auto_target.sh')} >/dev/null 2>&1`);
+            appendToOutput('[AUTO_TARGET] Immediate scan triggered via UI');
           }
 
           cfgInvalidate('toggle_auto_target');

@@ -17,6 +17,13 @@ sp_try() {
     return 1
   fi
   resetprop -n "$_st_name" "$_st_expected" 2>/dev/null || true
+  # Track original value for uninstall restore, only first time
+  if [ -n "$_st_current" ] && [ "$_st_current" != "$_st_expected" ]; then
+    if ! grep -qsF "|$_st_name|" "$PERSIST_RESTORE_FILE" 2>/dev/null; then
+      ensure_dir "$SPECTER_DIR" 2>/dev/null
+      echo "restore|$_st_name|$_st_current" >> "$PERSIST_RESTORE_FILE" 2>/dev/null || true
+    fi
+  fi
   unset _st_name _st_expected _st_current _st_needle _st_value
   return 0
 }
@@ -32,37 +39,6 @@ sp_persist() {
     fi
   fi
   unset _sp_name _sp_value _sp_original
-}
-
-hide_recovery_folders() {
-    _hrf_backup="/data/adb/recovery_backups"
-    _hrf_random="" _hrf_subdirs=0 _hrf_path=""
-
-    for _hrf_folder in TWRP OrangeFox FOX PBRP PitchBlack Recovery; do
-        _hrf_path="/sdcard/$_hrf_folder"
-        [ ! -d "$_hrf_path" ] && continue
-
-        if [ -f "$_hrf_path/.twrps" ]; then
-            rm -f "$_hrf_path/.twrps" 2>/dev/null || {
-                _hrf_random=$(head /dev/urandom 2>/dev/null | tr -dc A-Za-z0-9 | head -c 12)
-                [ -z "$_hrf_random" ] && _hrf_random="recovery_${$}"
-                mv "$_hrf_path" "/sdcard/$_hrf_random" 2>/dev/null
-                continue
-            }
-        fi
-
-        _hrf_path_recurse="$_hrf_path"
-        _hrf_subdirs=$(find "$_hrf_path_recurse" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)
-
-        if [ "$_hrf_subdirs" -gt 0 ]; then
-            mkdir -p "$_hrf_backup" 2>/dev/null
-            mv "$_hrf_path" "$_hrf_backup/" 2>/dev/null
-        else
-            rm -rf "$_hrf_path" 2>/dev/null
-        fi
-    done
-
-    unset _hrf_backup _hrf_random _hrf_subdirs _hrf_path _hrf_path_recurse _hrf_folder
 }
 
 apply_boot_hardening() {
@@ -86,7 +62,7 @@ apply_boot_props() {
   for _abp_prop in \
     ro.build.selinux:1 ro.secure:1 ro.crypto.state:encrypted \
     ro.hardware.virtual_device:0 ro.build.type:user ro.build.tags:release-keys \
-    ro.warranty_bit:0 ro.vendor.warranty_bit:0 ro.vendor.boot.warranty_bit:0 \
+    ro.boot.warranty_bit:0 ro.warranty_bit:0 ro.vendor.warranty_bit:0 ro.vendor.boot.warranty_bit:0 \
     ro.is_ever_orange:0 ro.secureboot.lockstate:locked \
     ro.boot.vbmeta.device_state:locked ro.boot.verifiedbootstate:green \
     ro.boot.flash.locked:1 ro.boot.veritymode:enforcing \
@@ -179,22 +155,45 @@ disable_bootloader_spoofer() {
 hexpatch_deleteprop() {
   _hd_prop="$1"
   [ -n "$_hd_prop" ] || return 0
-  _hd_magiskboot=$(command -v magiskboot 2>/dev/null || find /data/adb /data/data/me.bmax.apatch/patch/ -name magiskboot -print -quit 2>/dev/null)
-  if [ -n "$_hd_magiskboot" ]; then
-    _hd_file=$(resetprop -Z "$_hd_prop" 2>/dev/null | cut -d' ' -f2 | cut -d':' -f3)
-    [ -z "$_hd_file" ] && { resetprop -p --delete "$_hd_prop" 2>/dev/null || true; return 0; }
-    _hd_path=$(find /dev/__properties__/ -name "*$_hd_file*" -print -quit 2>/dev/null)
-    [ -z "$_hd_path" ] && { resetprop -p --delete "$_hd_prop" 2>/dev/null || true; return 0; }
-    _hd_search_hex=$(printf '%s' "$_hd_prop" | od -A n -t x1 | tr -d ' \n' | tr '[:lower:]' '[:upper:]')
-    _hd_search_len=$(printf '%s' "$_hd_prop" | wc -c)
-    _hd_replacement=$(head /dev/urandom 2>/dev/null | tr -dc '0-9a-f' | head -c "$_hd_search_len" 2>/dev/null || printf '%s' "$_hd_prop" | od -A n -t x1 | tr -d ' \n' | head -c "$((_hd_search_len * 2))")
-    _hd_replacement_hex=$(printf '%s' "$_hd_replacement" | od -A n -t x1 | tr -d ' \n' | tr '[:lower:]' '[:upper:]')
-    "$_hd_magiskboot" hexpatch "$_hd_path" "$_hd_search_hex" "$_hd_replacement_hex" >/dev/null 2>&1 || {
-      log "PROPS" "hexpatch failed for $_hd_prop, fell back to resetprop -p --delete"
-      resetprop -p --delete "$_hd_prop" 2>/dev/null || true
-    }
-  else
-    resetprop -p --delete "$_hd_prop" 2>/dev/null || true
-  fi
-  unset _hd_prop _hd_magiskboot _hd_file _hd_path _hd_search_hex _hd_search_len _hd_replacement _hd_replacement_hex
+  resetprop -p --delete "$_hd_prop" 2>/dev/null || true
+  unset _hd_prop
+}
+
+detect_region() {
+_dr_locale=$(getprop ro.system.locale 2>/dev/null || getprop persist.sys.locale 2>/dev/null || getprop ro.product.locale 2>/dev/null)
+    _dr_locale=${_dr_locale:-en-US}
+    _dr_country=$(echo "$_dr_locale" | sed 's/.*-//;s/.*_//')
+  printf '%s' "$_dr_country" | tr '[:upper:]' '[:lower:]'
+  unset _dr_locale _dr_country
+}
+
+apply_region_props() {
+  _ar_region=$(detect_region)
+  case "$_ar_region" in
+    cn)
+      for _p in "persist.radio.calls.on.ims:1" "persist.radio.jbims:1" "persist.radio.videocall.audio.output:1"; do
+        sp_try "${_p%%:*}" "${_p#*:}"
+      done
+      ;;
+    in)
+      for _p in "persist.radio.calls.on.ims:1" "persist.radio.jbims:1"; do
+        sp_try "${_p%%:*}" "${_p#*:}"
+      done
+      ;;
+    ru)
+      sp_try "persist.sys.locale" "ru-RU"
+      sp_try "persist.sys.language" "ru"
+      sp_try "persist.sys.country" "RU"
+      ;;
+    jp|ja)
+      sp_try "persist.radio.calls.on.ims:1"
+      ;;
+    kr|ko)
+      sp_try "persist.radio.calls.on.ims:1"
+      ;;
+    br)
+      sp_try "persist.radio.calls.on.ims:1"
+      ;;
+  esac
+  unset _ar_region _p
 }

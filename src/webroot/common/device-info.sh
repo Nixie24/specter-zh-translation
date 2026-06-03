@@ -25,11 +25,6 @@ _patch_date=$(grep -E '^(boot|all)=' /data/adb/tricky_store/security_patch.txt 2
 # Flags
 _twrp="false"; [ -f "$SPECTER_DIR/twrp" ] && _twrp="true"
 _blacklist="false"; [ -f "$SPECTER_DIR/blacklist_enabled" ] && _blacklist="true"
-_recovery_detected="false"
-for _rd in TWRP OrangeFox FOX PBRP PitchBlack Recovery; do
-  [ -d "/sdcard/$_rd" ] && { _recovery_detected="true"; break; }
-done
-
 # TEE status, read cached result from Specter dir
 _tee_status="unknown"
 if [ -f "$TEE_STATUS" ]; then
@@ -86,9 +81,8 @@ cat <<EOF > "$INFO_PATH"
   "pif_model": "$(_escape_json "$_pif_model")",
   "flags": {
     "twrp": $_twrp,
-    "blacklist": $_blacklist,
-    "recovery_detected": $_recovery_detected
+    "blacklist": $_blacklist
   }
 }
 EOF
-unset _android_ver _kernel_ver _root_type _version _tee_status _build_patch _patch_date _pif_model _twrp _blacklist _recovery_detected _rd
+unset _android_ver _kernel_ver _root_type _version _tee_status _build_patch _patch_date _pif_model _twrp _blacklist

@@ -91,12 +91,6 @@ assert_exit_code "feature: disabled when toggle=0" 1 $_rc
 _feature_should_run "opt_in_feature" 0; _rc=$?
 assert_exit_code "feature: opt-in defaults to disabled" 1 $_rc
 
-# ---- hide_recovery_folders ----
-bootstrap
-source_libs
-hide_recovery_folders
-ok "recovery: no crash when no recovery dirs"
-
 # ---- hexpatch_deleteprop ----
 bootstrap
 source_libs

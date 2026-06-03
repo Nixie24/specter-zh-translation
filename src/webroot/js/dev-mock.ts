@@ -180,7 +180,7 @@ if (typeof window.ksu === 'undefined') {
         security_patch: '2026-04-05',
         build_patch: '2026-04-05',
         pif_model: 'Google Pixel 8 Pro XL Super Max Ultra Edition',
-        flags: { twrp: false, blacklist: false, recovery_detected: false },
+        flags: { twrp: false, blacklist: false },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     }
 

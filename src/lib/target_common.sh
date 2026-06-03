@@ -72,6 +72,57 @@ _read_tee_status() {
   [ -f "$TEE_STATUS" ] && teeBroken=$(grep -E '^(teeBroken|tee_broken)=' "$TEE_STATUS" 2>/dev/null | cut -d= -f2 || echo "false")
 }
 
+# Merge helpers — used by --merge and --merge-denylist in target.sh
+
+_merge_setup() {
+  _count=0; _added=0
+  _TMP_EXIST="${TARGET_TXT}.exist.$$"
+  _TMP_TARGET="${TARGET_TXT}.new.$$"
+}
+
+_merge_cleanup() {
+  rm -f "${TARGET_TXT}.bak" 2>/dev/null
+  [ -f "$TARGET_TXT" ] && cp "$TARGET_TXT" "${TARGET_TXT}.bak" 2>/dev/null
+  [ -f "$_TMP_TARGET" ] && mv -f "$_TMP_TARGET" "$TARGET_TXT"
+  unset _TMP_EXIST _TMP_TARGET _count _added
+}
+
+_merge_load_existing() {
+  if [ -f "$TARGET_TXT" ] && [ -s "$TARGET_TXT" ]; then
+    cp "$TARGET_TXT" "$_TMP_TARGET"
+    : > "$_TMP_EXIST"
+    tr -d '\r' < "$TARGET_TXT" 2>/dev/null | while IFS= read -r _line || [ -n "$_line" ]; do
+      [ -z "$_line" ] && continue
+      case "$_line" in \[*\]) continue ;; esac
+      _base=$(_normalize_pkg "$_line")
+      [ -n "$_base" ] && printf '%s\n' "$_base" >> "$_TMP_EXIST"
+    done
+  else
+    : > "$_TMP_TARGET"
+    : > "$_TMP_EXIST"
+  fi
+}
+
+_normalize_pkg() {
+  _np_line="$1"
+  case "$_np_line" in *!) _np_line=${_np_line%!} ;; *\?) _np_line=${_np_line%\?} ;; esac
+  printf '%s' "$_np_line"
+  unset _np_line
+}
+
+_append_missing() {
+  _am_line="$1"
+  _am_base=$(_normalize_pkg "$_am_line")
+  [ -z "$_am_base" ] && { unset _am_line _am_base; return 0; }
+  if ! grep -Fxq "$_am_base" "$_TMP_EXIST" 2>/dev/null; then
+    printf '%s\n' "$_am_line" >> "$_TMP_TARGET"
+    printf '%s\n' "$_am_base" >> "$_TMP_EXIST"
+    _added=$((_added + 1))
+  fi
+  _count=$((_count + 1))
+  unset _am_line _am_base
+}
+
 # Compute suffix for a given package based on customize.txt and TEE status
 # Sets $_suffix and $_custom_matched
 _compute_suffix() {
@@ -99,7 +150,5 @@ _compute_suffix() {
   elif [ "$_customize_mode" = "condition_all" ]; then
     _suffix="?"
   fi
-  if [ -z "$_suffix" ] && [ "$_custom_matched" != "true" ]; then
-    [ "$teeBroken" = "true" ] && _suffix="?"
-  fi
+
 }

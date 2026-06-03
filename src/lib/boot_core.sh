@@ -2,16 +2,20 @@
 
 [ -n "$MODDIR" ] || { echo "[BOOT] MODDIR not set" >&2; exit 1; }
 
-log "BOOT" "Running unified boot core"
-
+BOOT_LOG="$SPECTER_DIR/log/boot.log"
 mkdir -p "$SPECTER_DIR/log" 2>/dev/null || true
+log_rotate "$BOOT_LOG"
+exec >>"$BOOT_LOG" 2>&1
+
+log "BOOT" "Running unified boot core"
 
 if [ "$(cfg_get toggle_prop_handler 1)" != "0" ]; then
   [ "$(cfg_get boot_state_props 1)" != "0" ] && apply_boot_props
   [ "$(cfg_get spoof_build_props 1)" != "0" ] && spoof_build_props
+  [ "$(cfg_get region_props 1)" != "0" ] && apply_region_props
 fi
 
-for _bf in recovery boot_hardening lsposed adb_disabler rom_fingerprint vbmeta; do
+for _bf in boot_hardening lsposed adb_disabler rom_fingerprint vbmeta; do
   case "$_bf" in *[!a-zA-Z0-9_-]*) log "BOOT" "Skipping invalid feature: $_bf"; continue ;; esac
   _bf_default=1
   case "$_bf" in adb_disabler|rom_fingerprint) _bf_default=0 ;; esac
@@ -28,6 +32,10 @@ fi
 
 log "BOOT" "Boot-time features done"
 
+if [ "$ROOT_SOL" = "magisk" ] && [ "$(cfg_get toggle_denylist_merge 1)" != "0" ]; then
+  sh "$MODDIR/features/target.sh" --merge-denylist >"$SPECTER_DIR/log/boot_denylist.log" 2>&1 || log "BOOT" "Denylist merge failed"
+fi
+
 log "BOOT" "Cleaning bootloader spoofer"
 disable_bootloader_spoofer 2>/dev/null || true
 
@@ -41,24 +49,14 @@ if [ -f "$SPECTER_DIR/rom_spoof_reported" ]; then
   rm -f "$SPECTER_DIR/rom_spoof_reported"
 fi
 
-sh "$MODDIR/features/keybox_info.sh" >/dev/null 2>&1 &
+(sleep 60; sh "$MODDIR/features/keybox_info.sh") >/dev/null 2>&1 &
 
 . "$MODDIR/lib/desc.sh"
 refresh_module_description
 
-if [ "$(cfg_get toggle_prop_handler 1)" != "0" ]; then
-  (
-    while [ -f "$SPECTER_DIR/loop_prop_handler.pid" ]; do
-      sleep 3600
-      [ -d "$MODDIR" ] || exit 0
-      sh "$MODDIR/features/boot_state_props.sh" >>"$SPECTER_DIR/log/boot_state_props.log" 2>&1 || true
-    done
-  ) &
-  echo "$!" > "$SPECTER_DIR/loop_prop_handler.pid"
-fi
-
-if [ "$(cfg_get toggle_auto_target 0)" = "1" ]; then
-  sh "$MODDIR/features/auto_target.sh" >"$SPECTER_DIR/log/auto_target.log" 2>&1 &
+if [ "$(cfg_get toggle_scheduler 1)" != "0" ]; then
+  sh "$MODDIR/lib/scheduler.sh" >"$SPECTER_DIR/log/scheduler.log" 2>&1 &
+  log "BOOT" "Scheduler launched (PID $!)"
 fi
 
 (

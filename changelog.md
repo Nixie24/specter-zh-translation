@@ -1,3 +1,45 @@
+# v1.4.4.07
+
+## Removed
+- **Recovery feature deleted entirely**: `src/features/recovery.sh`, `hide_recovery_folders()` from `props.sh`, recovery toggle from WebUI (index.html, constants.ts, all lang files), `recovery_detected` from device-info JSON + TypeScript types + mock, stale references in cleanup.sh, boot_core.sh dispatch, and all recovery tests
+- **Prop handler removed from scheduler**: boot state props are one-time at boot, no need for hourly re-runs (`scheduler.sh` prop_handler task deleted)
+
+## Added
+- **Scheduler system** (`src/lib/scheduler.sh`): central periodic task daemon — runs keybox_info.sh every 6h and auto_target.sh every 5min; uses inotifyd for app-install triggered scans; manages PID/task lifecycle
+- **Region props** (`props.sh`): `detect_region()` + `apply_region_props()` sets IMS/locale props per region (CN, IN, RU, JP, KR, BR), gated by `region_props` config
+- **Boot logging**: boot_core.sh now logs to `$SPECTER_DIR/log/boot.log` with rotation; `log.sh` writes to Android logcat + added `log_rotate()` helper
+- **Denylist merge at boot**: `target.sh --merge-denylist` imports magisk denylist packages into target.txt
+- **`post-fs-data.sh` async boot_core.sh**: sleep-15 fallback for KSU/APatch module managers that skip boot-completed.sh
+
+## Changed
+- **Keybox boot race fixed**: keybox_info.sh delayed 60s (`sleep 60; sh ...`) so network is ready before catalog download
+- **Auto Target → one-shot scan**: daemon loop replaced with single-pass scan tracking seen packages via `auto_known_packages.txt`; no longer checks TEE status for `?` suffix; no PID file, no interval loop; now defaults to ON
+- **WebUI target-apps.ts — click split**: row click toggles unchecked↔bare (target) or unchecked↔blacklisted (blacklist); circle click cycles bare→conditional→force→bare. Removed unused `TARGET_STATE_ORDER`
+- **Target merge helpers extracted**: `_merge_setup`, `_merge_cleanup`, `_merge_load_existing`, `_normalize_pkg`, `_append_missing` moved from target.sh into target_common.sh; teeBroken→? default suffix fallback removed
+- **Props**: `sp_try()` saves originals to `PERSIST_RESTORE_FILE` for uninstall restore; `apply_boot_props` now includes `ro.boot.warranty_bit:0`; `hexpatch_deleteprop()` simplified (no more magiskboot hexpatch, always resetprop -p --delete)
+- **rom_fingerprint.sh**: LineageOS camera packagelist scrub (`vendor.camera.aux.packagelist`, `persist.vendor.camera.privapp.list`), `vendor.lineage_health` service kill, `ro.product.vendor.name` added to prefix list, hexpatch calls → direct `resetprop --delete`
+- **action.sh**: full pipeline wrapped with `tee -a "$ACTION_LOG"` + log rotation
+- **desc.sh**: removed "skip if unchanged" optimization (always writes new description)
+- **device.ts**: added missing `t()` helper (`getTranslation(key) || fallback`) so TEE labels render correctly
+- **WebUI i18n**: 10 new keys (`tee_broken`, `tee_normal`, `dialog_confirm`, `boot_harden_dialog_*`, `kb_refresh_btn`, `clear_history_btn`, `home_events_initial`, `auto_target_interval_aria`) synced across all 5 languages
+- **`package.json`**: zip filename now `Specter-v{version}.zip` (v prefix)
+- **`update.json`**: version 1.4.4.07, versionCode 14407
+
+## Removed Features
+- `src/features/recovery.sh`, `hide_recovery_folders()`, `toggle_recovery` toggle
+- `recovery_detected` field from InfoJson type + device-info.sh + dev-mock
+- `tests/test_recovery.sh`
+- `suspicious_props` (consolidated into boot_state_props.sh in v1.4.4)
+- Stale `toggle_recovery` reference in test_boot_core.sh
+- `toggle-action_pif` default override (was `'0'`)
+- Inline prop handler loop + auto_target daemon from boot_core.sh (replaced by scheduler)
+
+## Bug Fixes
+- Keybox info showing "Generic" at boot (network race): added 60s delay
+- device.ts `ReferenceError` on TEE label rendering: added missing `t()` translation helper
+- `desc.sh` redundant overwrite: removed skip-if-unchanged optimization
+- auto_target interval field in WebUI no longer starts/stops daemon (one-shot only)
+
 # v1.4.4
 
 ## New

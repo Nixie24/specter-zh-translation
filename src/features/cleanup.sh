@@ -23,9 +23,6 @@ _rm() {
   rm -rf "$1" 2>/dev/null || log "CLEANUP" "Warning: Failed to remove $1"
 }
 
-log "CLEANUP" "Hiding recovery folders..."
-hide_recovery_folders
-
 log "CLEANUP" "Removing detector app data directories..."
 for _pkg in $DETECTOR_APPS; do
   _rm "/storage/emulated/0/Android/data/$_pkg"

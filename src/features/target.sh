@@ -33,47 +33,30 @@ _ensure_target_txt() {
 _ensure_target_txt
 
 case "${1}" in
+  --merge-denylist)
+    log "TARGET" "Mode: merge-denylist"
+    command -v magisk >/dev/null 2>&1 || { log "TARGET" "magisk not found, skipping"; exit 0; }
+    _merge_setup
+    trap 'rm -f "$_TMP_TARGET" "$_TMP_EXIST"' EXIT
+    _merge_load_existing
+
+    _denylist=$(magisk --denylist ls 2>/dev/null | awk -F'|' '{print $1}' | grep -v "isolated" || true)
+    if [ -n "$_denylist" ]; then
+      for _pkg in $_denylist; do
+        [ -z "$_pkg" ] && continue
+        _append_missing "$_pkg"
+      done
+      unset _pkg
+    fi
+
+    _merge_cleanup
+    log "TARGET" "Denylist merge: checked $_count entries, added $_added"
+    ;;
   --merge)
     log "TARGET" "Mode: merge"
-    _count=0; _added=0
-    _TMP_EXIST="${TARGET_TXT}.exist.$$"
+    _merge_setup
     trap 'rm -f "$TEMP_PKGS" "${TEMP_PKGS}.filtered" "$_TMP_TARGET" "$_TMP_EXIST"' EXIT
-
-    _normalize_pkg() {
-      _line="$1"
-      case "$_line" in *!) _line=${_line%!} ;; *\?) _line=${_line%\?} ;; esac
-      printf '%s' "$_line"
-    }
-
-    _record_existing() {
-      [ -f "$_TMP_EXIST" ] || : > "$_TMP_EXIST"
-      tr -d '\r' < "$TARGET_TXT" 2>/dev/null | while IFS= read -r _line || [ -n "$_line" ]; do
-        [ -z "$_line" ] && continue
-        case "$_line" in \[*\]) continue ;; esac
-        _base=$(_normalize_pkg "$_line")
-        [ -n "$_base" ] && printf '%s\n' "$_base" >> "$_TMP_EXIST"
-      done
-    }
-
-    _append_missing() {
-      _line="$1"
-      _base=$(_normalize_pkg "$_line")
-      [ -z "$_base" ] && return 0
-      if ! grep -Fxq "$_base" "$_TMP_EXIST" 2>/dev/null; then
-        printf '%s\n' "$_line" >> "$_TMP_TARGET"
-        printf '%s\n' "$_base" >> "$_TMP_EXIST"
-        _added=$((_added + 1))
-      fi
-      _count=$((_count + 1))
-    }
-
-    if [ -f "$TARGET_TXT" ] && [ -s "$TARGET_TXT" ]; then
-      cp "$TARGET_TXT" "$_TMP_TARGET"
-      _record_existing
-    else
-      : > "$_TMP_TARGET"
-      : > "$_TMP_EXIST"
-    fi
+    _merge_load_existing
 
     for entry in $FIXED_TARGETS; do
       _append_missing "$entry"
@@ -100,10 +83,7 @@ case "${1}" in
       rm -f "$TEMP_PKGS" "${TEMP_PKGS}.filtered"
     fi
 
-    rm -f "${TARGET_TXT}.bak"
-    [ -f "$TARGET_TXT" ] && cp "$TARGET_TXT" "${TARGET_TXT}.bak"
-    mv -f "$_TMP_TARGET" "$TARGET_TXT"
-
+    _merge_cleanup
     log "TARGET" "Checked $_count entries, added $_added"
     ;;
   *)

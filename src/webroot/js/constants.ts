@@ -20,7 +20,6 @@ export interface ToggleDef {
 }
 
 export const CONTROL_TOGGLES: ToggleDef[] = [
-  { id: 'toggle-recovery', key: 'toggle_recovery' },
   { id: 'toggle-boot_hardening', key: 'toggle_boot_hardening' },
   { id: 'toggle-prop_handler', key: 'toggle_prop_handler' },
   { id: 'toggle-lsposed', key: 'toggle_lsposed' },
@@ -31,7 +30,7 @@ export const CONTROL_TOGGLES: ToggleDef[] = [
   { id: 'toggle-action_target', key: 'toggle_action_target' },
   { id: 'toggle-action_security_patch', key: 'toggle_action_security_patch' },
   { id: 'toggle-action_keybox', key: 'toggle_action_keybox' },
-  { id: 'toggle-action_pif', key: 'toggle_action_pif', default: '0' },
+  { id: 'toggle-action_pif', key: 'toggle_action_pif' },
 ];
 
 export function defaultSecurityPatch(): string {

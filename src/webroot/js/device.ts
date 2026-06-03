@@ -3,6 +3,7 @@ import { runScript } from './bridge.js';
 import { appendToOutput } from './terminal.js';
 import { API_URLS } from './constants.js';
 import { getTranslation } from './i18n.js';
+const t = (key: string, fallback: string): string => getTranslation(key) || fallback;
 import type { InfoJson, KeyboxInfoJson } from './types.js';
 
 export async function initDevice() {
@@ -41,12 +42,8 @@ function applyDeviceInfo(data: InfoJson) {
   setText('version-info-value', data.version || '—');
 }
 
-function applyFlags(flags: { twrp?: boolean; recovery_detected?: boolean }) {
+function applyFlags(flags: { twrp?: boolean }) {
   if (!flags) return;
-  const recoveryRow = document.getElementById('toggle-recovery-row');
-  if (recoveryRow) {
-    recoveryRow.style.display = flags.recovery_detected ? '' : 'none';
-  }
 }
 
 function applyKeyboxStatus(data: KeyboxInfoJson) {
@@ -112,7 +109,7 @@ function applyTeeStatus(data: InfoJson) {
   const spTee = document.getElementById('sp-tee');
   if (!el || !card) return;
   const status = data.tee_status || '';
-  const label = status === 'broken' ? 'Broken' : status === 'normal' ? 'Normal' : '—';
+  const label = status === 'broken' ? t('tee_broken', 'Broken') : status === 'normal' ? t('tee_normal', 'Normal') : '—';
   el.textContent = label;
   card.className = 'info-card-mini';
   if (status === 'broken') {

@@ -53,10 +53,6 @@ CF_EOF
     fi
   fi
 
-  # Skip write if unchanged
-  _old_desc=$(cfg_get "override.description" "")
-  [ "$_new_desc" = "$_old_desc" ] && { unset _new_desc _old_desc _cf _kb_info _kb_src _kb_ver _kb_rev _kb_soft _apps _patch _title; return 0; }
-
   cfg_set "override.description" "$_new_desc"
 
   _escaped=$(printf '%s\n' "$_new_desc" | sed 's|[#/&\]|\\&|g')
@@ -67,5 +63,5 @@ CF_EOF
     "$_ksud" module config --internal Specter set override.description "$_new_desc" 2>/dev/null || true
   done
 
-  unset _new_desc _old_desc _escaped _cf _kb_info _kb_src _kb_ver _kb_rev _kb_soft _apps _patch _title _ksud
+  unset _new_desc _escaped _cf _kb_info _kb_src _kb_ver _kb_rev _kb_soft _apps _patch _title _ksud
 }

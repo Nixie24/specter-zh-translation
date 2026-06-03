@@ -143,7 +143,7 @@
                   <span class="kb-hero-status-label" data-i18n="home_status">Status</span>
                   <div class="kb-hero-status-inner">
                     <span class="kb-hero-status-text" id="keybox-status">—</span>
-                    <md-icon-button id="kb-refresh-btn" aria-label="Refresh">
+                    <md-icon-button id="kb-refresh-btn" aria-label="Refresh" data-i18n-aria="kb_refresh_btn">
                       <md-icon>refresh</md-icon>
                     </md-icon-button>
                   </div>
@@ -197,8 +197,8 @@
             <div class="recent-activity-header">
               <span class="recent-activity-title" data-i18n="history_title">Recent activity</span>
               <div style="display:flex;align-items:center;gap:2px">
-                <span class="recent-activity-count" id="activity-count">0 events</span>
-                <md-icon-button id="clear-history-btn" aria-label="Clear history">
+                <span class="recent-activity-count" id="activity-count" data-i18n="home_events_initial">0 events</span>
+                <md-icon-button id="clear-history-btn" aria-label="Clear history" data-i18n-aria="clear_history_btn">
                   <md-icon>delete</md-icon>
                 </md-icon-button>
               </div>
@@ -411,17 +411,6 @@
 
           <h2 class="list-title" data-i18n="control_boot_title">Boot Behavior</h2>
           <div class="list-container">
-
-            <div class="list-item list-item--toggle" id="toggle-recovery-row">
-              <div class="li-icon"><md-icon aria-hidden="true">folder_off</md-icon></div>
-              <div class="list-item-content">
-                <div class="toggle-text" data-i18n="control_toggle_recovery">Auto-Hide Recovery Folders</div>
-                <span class="supporting-text" data-i18n="control_toggle_recovery_desc">Hide TWRP, OrangeFox, FOX recovery folders from /sdcard at boot</span>
-              </div>
-              <div class="spacer"></div>
-              <md-switch icons id="toggle-recovery"></md-switch>
-              <md-ripple></md-ripple>
-            </div>
 
             <div class="list-item list-item--toggle" id="toggle-boot_hardening-row">
               <div class="li-icon"><md-icon aria-hidden="true">security</md-icon></div>

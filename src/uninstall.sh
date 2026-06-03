@@ -67,7 +67,23 @@ if [ -f "$SPECTER_DIR/conflict_backups.txt" ]; then
   log "UNINSTALL" "All conflict backups restored"
 fi
 
-# Clean up background loop PID files (so they self-terminate)
+# Clean up log files
+rm -f "$SPECTER_DIR/log/boot.log" 2>/dev/null
+rm -f "$SPECTER_DIR/log/action.log" 2>/dev/null
+
+# Clean up scheduler PID
+if [ -f "$SPECTER_DIR/scheduler.pid" ]; then
+  _sched_pid=$(cat "$SPECTER_DIR/scheduler.pid" 2>/dev/null || echo "")
+  [ -n "$_sched_pid" ] && kill "$_sched_pid" 2>/dev/null || true
+  rm -f "$SPECTER_DIR/scheduler.pid"
+fi
+
+# Clean up scheduler task data
+rm -rf "$SPECTER_DIR/scheduler_tasks" 2>/dev/null
+rm -f "$SPECTER_DIR/.inotify_handler.sh" 2>/dev/null
+rm -f "$SPECTER_DIR/auto_known_packages.txt" 2>/dev/null
+
+# Clean up legacy loop PID files
 for _pid_key in loop_prop_handler.pid loop_keybox_info.pid auto_target.pid; do
   _pid_path="$SPECTER_DIR/$_pid_key"
   if [ -f "$_pid_path" ]; then

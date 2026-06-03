@@ -8,7 +8,6 @@ plan "boot_core.sh — unified boot dispatch logic"
 # ---- scenario: feature dispatch loop ----
 bootstrap
 source_libs
-set_cfg "toggle_recovery" "1"
 set_cfg "toggle_boot_hardening" "1"
 set_cfg "toggle_lsposed" "0"
 set_cfg "toggle_security_patch" "1"
@@ -16,7 +15,7 @@ set_cfg "toggle_adb_disabler" "0"
 
 # Simulate the dispatch loop from boot_core.sh
 _features_run=""
-for _bf in recovery boot_hardening lsposed security_patch adb_disabler; do
+for _bf in boot_hardening lsposed security_patch adb_disabler; do
   case "$_bf" in *[!a-zA-Z0-9_-]*) continue ;; esac
   case "$_bf" in
     adb_disabler) _feature_should_run "$_bf" 0 || continue ;;
@@ -25,7 +24,6 @@ for _bf in recovery boot_hardening lsposed security_patch adb_disabler; do
   _features_run="$_features_run $_bf"
 done
 
-assert_contains "dispatch: recovery runs"       "$_features_run" "recovery"
 assert_contains "dispatch: boot_hardening runs" "$_features_run" "boot_hardening"
 assert_contains "dispatch: security_patch runs" "$_features_run" "security_patch"
 assert_not_contains "dispatch: lsposed skipped" "$_features_run" "lsposed"

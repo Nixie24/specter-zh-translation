@@ -10,17 +10,23 @@ esac
 . "$MODDIR/lib/paths.sh"
 . "$MODDIR/lib/config_env.sh"
 
-log "ACTION" "Running full integrity pipeline"
+ACTION_LOG="$SPECTER_DIR/log/action.log"
+ensure_dir "$SPECTER_DIR/log" 2>/dev/null
+log_rotate "$ACTION_LOG"
 
-sh "$MODDIR/orchestrator.sh" "action_integrity" || true
+{
+  log "ACTION" "Running full integrity pipeline"
 
-run_device_info "$MODDIR"
-sh "$MODDIR/features/keybox_info.sh" >/dev/null 2>&1 || true
+  sh "$MODDIR/orchestrator.sh" "action_integrity" || true
 
-[ -f "$MODDIR/module.prop.bak" ] && cp "$MODDIR/module.prop.bak" "$MODDIR/module.prop"
-. "$MODDIR/lib/desc.sh"
-refresh_module_description
+  run_device_info "$MODDIR"
+  sh "$MODDIR/features/keybox_info.sh" >/dev/null 2>&1 || true
 
-log "ACTION" "Full integrity pipeline completed"
+  [ -f "$MODDIR/module.prop.bak" ] && cp "$MODDIR/module.prop.bak" "$MODDIR/module.prop"
+  . "$MODDIR/lib/desc.sh"
+  refresh_module_description
+
+  log "ACTION" "Full integrity pipeline completed"
+} 2>&1 | tee -a "$ACTION_LOG"
 
 [ "${0##*/}" = "action.sh" ] && exit 0 || return 0

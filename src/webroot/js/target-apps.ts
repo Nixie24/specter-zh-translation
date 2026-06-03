@@ -16,7 +16,7 @@ interface TargetApp {
   state: AppState;
 }
 
-const TARGET_STATE_ORDER: TargetState[] = ['unchecked', 'bare', 'conditional', 'force'];
+const TARGET_MODE_ORDER: TargetState[] = ['bare', 'conditional', 'force'];
 const BLACKLIST_STATE_ORDER: BlacklistState[] = ['unchecked', 'blacklisted'];
 
 const TARGET_ICONS: Record<string, string> = {
@@ -48,12 +48,8 @@ function t(key: string, fallback: string): string {
 }
 
 function nextState(current: AppState, mode: Mode): AppState {
-  if (mode === 'blacklist') {
-    const idx = BLACKLIST_STATE_ORDER.indexOf(current as BlacklistState);
-    return BLACKLIST_STATE_ORDER[(idx + 1) % BLACKLIST_STATE_ORDER.length];
-  }
-  const idx = TARGET_STATE_ORDER.indexOf(current as TargetState);
-  return TARGET_STATE_ORDER[(idx + 1) % TARGET_STATE_ORDER.length];
+  const idx = BLACKLIST_STATE_ORDER.indexOf(current as BlacklistState);
+  return BLACKLIST_STATE_ORDER[(idx + 1) % BLACKLIST_STATE_ORDER.length];
 }
 
 function stateIcons(state: AppState, mode: Mode): string {
@@ -437,31 +433,50 @@ export async function openTargetAppsManager() {
           ? `<span class="ta-state-icon ta-state-text">${text}</span>`
           : '';
 
-      circle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        app.state = nextState(app.state, mode);
-        circle.setAttribute('data-state', app.state);
-        circle.setAttribute('aria-label', t(stateLabelKey(app.state, mode), app.state));
+      function applyAppState(newState: AppState) {
+        app.state = newState;
+        circle.setAttribute('data-state', newState);
+        circle.setAttribute('aria-label', t(stateLabelKey(newState, mode), newState));
         const iconEl = circle.querySelector('.ta-state-icon');
-        const newIcon = stateIcons(app.state, mode);
-        const newText = stateText(app.state, mode);
+        const ni = stateIcons(newState, mode);
+        const nt = stateText(newState, mode);
         if (iconEl) {
-          if (newIcon) {
-            iconEl.outerHTML = `<md-icon class="ta-state-icon">${newIcon}</md-icon>`;
-          } else if (newText) {
-            iconEl.outerHTML = `<span class="ta-state-icon ta-state-text">${newText}</span>`;
+          if (ni) {
+            iconEl.outerHTML = `<md-icon class="ta-state-icon">${ni}</md-icon>`;
+          } else if (nt) {
+            iconEl.outerHTML = `<span class="ta-state-icon ta-state-text">${nt}</span>`;
           } else {
             iconEl.remove();
           }
-        } else if (newIcon) {
-          circle.insertAdjacentHTML('beforeend', `<md-icon class="ta-state-icon">${newIcon}</md-icon>`);
-        } else if (newText) {
-          circle.insertAdjacentHTML('beforeend', `<span class="ta-state-icon ta-state-text">${newText}</span>`);
+        } else if (ni) {
+          circle.insertAdjacentHTML('beforeend', `<md-icon class="ta-state-icon">${ni}</md-icon>`);
+        } else if (nt) {
+          circle.insertAdjacentHTML('beforeend', `<span class="ta-state-icon ta-state-text">${nt}</span>`);
         }
-        item.dataset.state = app.state;
+        item.dataset.state = newState;
         circle.classList.remove('ta-state-circle--anim');
         void circle.offsetWidth;
         circle.classList.add('ta-state-circle--anim');
+      }
+
+      circle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (mode === 'blacklist') {
+          applyAppState(nextState(app.state, mode));
+        } else if (app.state === 'unchecked') {
+          applyAppState('bare');
+        } else {
+          const idx = TARGET_MODE_ORDER.indexOf(app.state as TargetState);
+          applyAppState(TARGET_MODE_ORDER[(idx + 1) % TARGET_MODE_ORDER.length]);
+        }
+      });
+
+      item.addEventListener('click', () => {
+        if (mode === 'blacklist') {
+          applyAppState(app.state === 'unchecked' ? 'blacklisted' : 'unchecked');
+        } else {
+          applyAppState(app.state === 'unchecked' ? 'bare' : 'unchecked');
+        }
       });
 
       const ripple = document.createElement('md-ripple');
