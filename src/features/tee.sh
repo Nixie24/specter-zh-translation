@@ -26,7 +26,7 @@ case "$_hash" in
 esac
 unset _i
 
-pm uninstall $PACKAGE 2>/dev/null || true
+pm uninstall $PACKAGE >/dev/null 2>&1 || true
 
 ensure_dir "$SPECTER_DIR"
 
