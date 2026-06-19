@@ -108,6 +108,9 @@ function showResultDialog(
       <span class="tee-hash-label">${t('boot_hash_label', 'Boot Hash')}</span>
       <span class="tee-hash-value">
         <code class="boot-hash-text">${bootHash}</code>
+        <md-icon-button id="tee-hash-copy" aria-label="${t('history_copy', 'Copy')}">
+          <md-icon aria-hidden="true">content_copy</md-icon>
+        </md-icon-button>
       </span>
     </div>
   `;
@@ -126,6 +129,13 @@ function showResultDialog(
   document.body.appendChild(dialog);
 
   dialog.querySelector('#tee-hash-close')!.addEventListener('click', () => dialog.close());
+  dialog.querySelector('#tee-hash-copy')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(bootHash).then(() => {
+      showToast(t('history_copied', 'Copied!'), { icon: 'check_circle', type: 'success', autoCloseDelay: 2000 });
+    }).catch(() => {
+      showToast(t('history_copy_failed', 'Failed'), { icon: 'error', type: 'error', autoCloseDelay: 2000 });
+    });
+  });
   dialog.querySelector('#tee-hash-save')!.addEventListener('click', async () => {
     try {
       const spDir = getSpDir();

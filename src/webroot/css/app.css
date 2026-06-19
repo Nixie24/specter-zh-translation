@@ -2513,6 +2513,11 @@ md-filled-tonal-button {
   color: var(--md-sys-color-on-surface-variant);
 }
 
+#tee-hash-copy {
+  --md-icon-button-icon-size: 16px;
+  width: 28px;
+  height: 28px;
+}
 .boot-hash-text {
   font-family: var(--sp-font-mono, 'JetBrains Mono Variable', 'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'SF Mono', ui-monospace, monospace);
   font-size: 0.8125rem;
