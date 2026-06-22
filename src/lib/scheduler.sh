@@ -17,9 +17,11 @@ ensure_dir "$SPECTER_DIR/log" 2>/dev/null
 
 if [ -f "$PID_FILE" ]; then
   _old_pid=$(cat "$PID_FILE" 2>/dev/null || echo "")
-  if [ -n "$_old_pid" ] && kill -0 "$_old_pid" 2>/dev/null; then
-    log "SCHED" "Already running (PID $_old_pid), exiting"
-    exit 0
+  if [ -n "$_old_pid" ] && [ -f "/proc/$_old_pid/cmdline" ]; then
+    _cmdline=$(tr '\0' ' ' < "/proc/$_old_pid/cmdline" 2>/dev/null || echo "")
+    case "$_cmdline" in
+      *scheduler*) log "SCHED" "Already running (PID $_old_pid), exiting"; exit 0 ;;
+    esac
   fi
   rm -f "$PID_FILE"
 fi
@@ -32,11 +34,10 @@ log "SCHED" "Started (PID $$)"
 if command -v inotifyd >/dev/null 2>&1 && [ "$(cfg_get toggle_auto_target 1)" = "1" ] && [ "$(cfg_get auto_target_method instant)" != "polling" ]; then
   cat > "$INOTIFY_HANDLER" <<EOF
 #!/system/bin/sh
-sleep 3
 MODDIR='${MODDIR}'
 SPECTER_DIR='${SPECTER_DIR}'
-[ "\$(cat \"\${SPECTER_DIR}/config/toggle_auto_target.val\" 2>/dev/null)" = "1" ] || exit 0
-sh "\${MODDIR}/features/auto_target.sh" >"\${SPECTER_DIR}/log/sched_auto_target.log" 2>&1 || true
+[ "\$(su -c "cat \${SPECTER_DIR}/config/toggle_auto_target.val" 2>/dev/null)" = "1" ] || exit 0
+su -c "sh \${MODDIR}/features/auto_target.sh" 2>/dev/null || true
 . "\${MODDIR}/lib/desc.sh" 2>/dev/null
 refresh_module_description 2>/dev/null || true
 EOF
@@ -52,7 +53,8 @@ while true; do
 
   for _task_line in keybox_info:keybox_info.sh:21600:toggle_keybox_info \
                     auto_target:auto_target.sh:300:toggle_auto_target \
-                    autopif:pif.sh:86400:toggle_autopif; do
+                    autopif:pif.sh:86400:toggle_autopif \
+                    autokeybox:keybox.sh:86400:toggle_autokeybox; do
     _name="${_task_line%%:*}"
     _rest="${_task_line#*:}"
     _script="${_rest%%:*}"
@@ -73,7 +75,7 @@ while true; do
       printf '%s' "$_now" > "$TASKS_DIR/${_name}_last"
 
       case "$_name" in
-        keybox_info|auto_target|autopif)
+        keybox_info|auto_target|autopif|autokeybox)
           refresh_module_description
           ;;
       esac

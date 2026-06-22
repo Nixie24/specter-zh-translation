@@ -36,6 +36,7 @@ export const CONTROL_TOGGLES: ToggleDef[] = [
   { id: 'toggle-background_auto_target', key: 'toggle_auto_target', icon: 'my_location', section: 'background' },
   { id: 'toggle-background_keybox_info', key: 'toggle_keybox_info', icon: 'refresh', section: 'background' },
   { id: 'toggle-background_autopif', key: 'toggle_autopif', default: '0', icon: 'fingerprint', section: 'background' },
+  { id: 'toggle-background_autokeybox', key: 'toggle_autokeybox', default: '0', icon: 'vpn_key', section: 'background' },
 ];
 
 export const FEATURE_I18N_KEYS: Record<string, string> = {

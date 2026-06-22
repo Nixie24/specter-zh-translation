@@ -1,17 +1,23 @@
 # v1.4.4.15
 
+**New**
+- Pull-to-refresh on App Targeting page
+- Default Mode dialog for target apps (Auto/Leaf/Gen + override switch)
+- Custom boot hash Priority 0 in 4-tier chain; immediate `resetprop` on save
+- Auto keybox: periodic fetch via scheduler task (disabled by default), interval config dialog
+
 **Changed**
-- Boot hash priority chain restructured: TEE attestation → existing prop → VBMeta partition; bootloader-set prop kept as-is when valid
-- `tee.sh` moved before `boot_hash.sh` in service order
-- `TEE_HASH` → `TEE_BHASH` throughout; files renamed: `check_tee_hash.sh` → `check_tee_bhash.sh`, `tee-hash-ui.ts` → `tee-bhash-ui.ts`
-- Check TEE & Boot Hash UI is read-only — removed "Update cache" button
-- PIF fingerprint validation at boot (skip re-fetch if valid)
-- VBMeta & Boot Hash toggles added to Prop Handler dialog; `toggle-vbmeta` removed from Control page
-- Themed Android fallback icon in target apps
-- `toggle_autopif` default changed to `0`
+- Boot hash chain: Custom → TEE → prop → partition; `vbmeta.sh` deleted, logic merged into `boot_hash.sh`
+- `TEE_HASH` → `TEE_BHASH`; files renamed accordingly
+- Prop Handler dialog: added "TEE Boot Hash", removed "VBMeta Integration"
+- Conflict hints use human-readable names via `FEATURE_I18N_KEYS`
+- Boot hash UI is read-only (no Update cache/save)
+- `toggle-vbmeta` removed from Control; `toggle_autopif` default `0`
+- Auto-target inotify handler simplified; uses `su -c` to bypass KernelSU SELinux restrictions
 
 **Fixed**
 - Boot hash never applied on first boot (`tee.sh` ran after `boot_hash.sh`)
+- Scheduler stale PID check: `kill -0` can match reused PID after reboot; now verifies cmdline
 
 # v1.4.4.14
 

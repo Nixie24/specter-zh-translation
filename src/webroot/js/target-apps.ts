@@ -677,24 +677,29 @@ export async function openTargetAppsManager() {
     const onTouchStart = (e: TouchEvent) => {
       if (ptrList.scrollTop > 0 || triggered || e.touches.length !== 1) return;
       startY = e.touches[0]!.clientY;
-      pulling = true;
-      indicator.classList.add('ptr-dragging');
-      e.preventDefault();
     };
     const onTouchMove = (e: TouchEvent) => {
-      if (!pulling || e.touches.length !== 1) return;
+      if (e.touches.length !== 1) return;
       const dy = e.touches[0]!.clientY - startY;
+      if (!pulling) {
+        if (dy > 0 && ptrList.scrollTop === 0) {
+          pulling = true;
+          indicator.classList.add('ptr-dragging');
+          e.preventDefault();
+        }
+        return;
+      }
       if (dy < 0) {
         doCancel();
         return;
       }
+      e.preventDefault();
       const pull = Math.min(dy * RESISTANCE, MAX_PULL);
       const pct = Math.min(pull / THRESHOLD, 1);
 
       indicator.style.opacity = String(pct);
       setIndicatorPull(pull);
       arrow.style.transform = `rotate(${pct * 360}deg)`;
-      e.preventDefault();
     };
     const onTouchEnd = () => { doEnd(); };
 

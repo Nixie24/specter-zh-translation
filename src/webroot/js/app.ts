@@ -66,6 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   import('./target-apps.js').then(m => m.wireTargetApps()).catch(() => {});
   import('./auto-target-ui.js').then(m => m.wireAutoTarget()).catch(() => {});
   import('./autopif-ui.js').then(m => m.wireAutopif()).catch(() => {});
+  import('./autokeybox-ui.js').then(m => m.wireAutokeybox()).catch(() => {});
   import('./rom-fingerprint-ui.js').then(m => m.wireRomFingerprint()).catch(() => {});
   import('./adb-disabler-ui.js').then(m => {
     m.wireAdbDisabler();
